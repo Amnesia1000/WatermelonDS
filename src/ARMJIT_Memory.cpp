@@ -211,16 +211,24 @@ void ARMJIT_Memory::SigsegvHandler(int sig, siginfo_t* info, void* rawContext)
 
     ucontext_t* context = (ucontext_t*)rawContext;
 
-    FaultDescription desc {};
-    u8* curArea = (u8*)(NDS::Current->CurCPU == 0 ? NDS::Current->JIT.Memory.FastMem9Start : NDS::Current->JIT.Memory.FastMem7Start);
-
-    desc.EmulatedFaultAddr = (u8*)info->si_addr - curArea;
-    desc.FaultPC = (u8*)context->CONTEXT_PC;
-
-    if (FaultHandler(desc, *NDS::Current))
+    melonDS::NDS* nds = NDS::Current;
+    if (nds)
     {
-        context->CONTEXT_PC = (u64)desc.FaultPC;
-        return;
+        void* curArea = nds->CurCPU == 0 ? nds->JIT.Memory.FastMem9Start : nds->JIT.Memory.FastMem7Start;
+        uintptr_t areaStart = reinterpret_cast<uintptr_t>(curArea);
+        uintptr_t faultAddr = reinterpret_cast<uintptr_t>(info->si_addr);
+        if (curArea && faultAddr >= areaStart && faultAddr - areaStart < AddrSpaceSize)
+        {
+            FaultDescription desc {};
+            desc.EmulatedFaultAddr = static_cast<u32>(faultAddr - areaStart);
+            desc.FaultPC = (u8*)context->CONTEXT_PC;
+
+            if (FaultHandler(desc, *nds))
+            {
+                context->CONTEXT_PC = (u64)desc.FaultPC;
+                return;
+            }
+        }
     }
 
     struct sigaction* oldSa;

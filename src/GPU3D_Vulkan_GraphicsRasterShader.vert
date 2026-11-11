@@ -45,7 +45,7 @@ void main()
 
     uint polyAttrV = vTriInfo1In.z;
     uint flagsV = vTriInfo0In.x;
-    float ventanaIgual = (polyAttrV & (1u << 14u)) != 0u
+    float ventanaIgual = (polyAttrV & (1u << 14u)) != 0u && (flagsV & (1u << 17u)) == 0u
         ? ((flagsV & (1u << 4u)) != 0u ? 512.0 : 1024.0)
         : 0.0;
     float depth = clamp((z - ventanaIgual) * (1.0 / 16777216.0), 0.0, 1.0);

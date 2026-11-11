@@ -56,6 +56,7 @@ public:
     bool SupportsTimelineSemaphores() const { return TimelineSemaphoresSupported; }
     bool SupportsDisplayTiming() const { return DisplayTimingSupported; }
     bool SupportsDynamicTextureIndexing() const { return DynamicTextureIndexingSupported; }
+    bool SupportsDepthBounds() const { return DepthBoundsSupported; }
     bool IsTimelineSemaphoreForcedOff() const { return ForceDisableTimelineSemaphores; }
     bool IsDynamicTextureIndexingForcedOff() const { return ForceDisableDynamicTextureIndexing; }
 
@@ -93,6 +94,7 @@ private:
     bool TimelineSemaphoresSupported = false;
     bool DisplayTimingSupported = false;
     bool DynamicTextureIndexingSupported = false;
+    bool DepthBoundsSupported = false;
     bool ForceDisableTimelineSemaphores = false;
     bool ForceDisableDynamicTextureIndexing = false;
     VulkanDeviceProfile DeviceProfile{};

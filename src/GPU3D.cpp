@@ -168,6 +168,7 @@ void GPU3D::SetCurrentRenderer(std::unique_ptr<Renderer3D>&& renderer) noexcept
 
 void GPU3D::ResetRenderingState() noexcept
 {
+    CurrentRenderer->FinishFramePreparation();
     RenderNumPolygons = 0;
 
     RenderDispCnt = 0;
@@ -189,6 +190,7 @@ void GPU3D::ResetRenderingState() noexcept
 
 void GPU3D::Reset() noexcept
 {
+    CurrentRenderer->FinishFramePreparation();
     CmdFIFO.Clear();
     CmdPIPE.Clear();
 
@@ -313,6 +315,7 @@ void GPU3D::Reset() noexcept
 
 void GPU3D::DoSavestate(Savestate* file) noexcept
 {
+    CurrentRenderer->FinishFramePreparation();
     file->Section("GP3D");
 
     SoftRenderer* softRenderer = dynamic_cast<SoftRenderer*>(CurrentRenderer.get());
@@ -924,6 +927,27 @@ int ClipAgainstPlane(const GPU3D& gpu, Vertex* vertices, int nverts, int clipsta
 template<bool attribs>
 int ClipPolygon(GPU3D& gpu, Vertex* vertices, int nverts, int clipstart)
 {
+    bool inside = true;
+    for (int i = 0; i < nverts; i++)
+    {
+        const s32* position = vertices[i].Position;
+        const s32 w = position[3];
+        if (w < 0 || position[0] < -w || position[0] > w
+            || position[1] < -w || position[1] > w
+            || position[2] < -w || position[2] > w)
+        {
+            inside = false;
+            break;
+        }
+    }
+    if (inside)
+    {
+        for (int i = 0; i < nverts; i++)
+            for (int component = 0; component < 3; component++)
+                vertices[i].Color[component] |= 0xFFF;
+        return nverts;
+    }
+
     // clip.
     // for each vertex:
     // if it's outside, check if the previous and next vertices are inside
@@ -2467,6 +2491,7 @@ bool YSort(Polygon* a, Polygon* b)
 
 void GPU3D::VBlank() noexcept
 {
+    CurrentRenderer->FinishFramePreparation();
     if (GeometryEnabled)
     {
         if (RenderingEnabled)
@@ -2545,6 +2570,7 @@ void GPU3D::VBlank() noexcept
 
 void GPU3D::VCount215(GPU& gpu) noexcept
 {
+    CurrentRenderer->FinishFramePreparation();
     RenderScreenSwapAt3D = (NDS.PowerControl9 & (1u << 15)) != 0;
     CurrentRenderer->RenderFrame(gpu);
 }
@@ -2600,6 +2626,7 @@ bool GPU3D::GetLastServedCaptureSourceIdentity(
         outIdentity = {};
         return false;
     }
+    CurrentRenderer->FinishFramePreparation();
     return CurrentRenderer->GetLastServedCaptureSourceIdentity(outIdentity);
 }
 
@@ -2612,6 +2639,7 @@ bool GPU3D::GetLiveRenderProductIdentity(
         return false;
     }
 
+    CurrentRenderer->FinishFramePreparation();
     return CurrentRenderer->GetLiveRenderProductIdentity(outIdentity);
 }
 
@@ -3032,7 +3060,11 @@ void GPU3D::Write32(u32 addr, u32 val) noexcept
 void GPU3D::Blit(const GPU& gpu) noexcept
 {
     if (CurrentRenderer)
+    {
         CurrentRenderer->Blit(gpu);
+        if (GeometryEnabled && RenderingEnabled)
+            CurrentRenderer->PrepareFrameGeometry(*this);
+    }
 }
 
 Renderer3D::Renderer3D(bool Accelerated)

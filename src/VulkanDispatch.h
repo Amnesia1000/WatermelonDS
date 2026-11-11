@@ -53,6 +53,7 @@ extern PFN_vkCmdFillBuffer vkCmdFillBuffer;
 extern PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier;
 extern PFN_vkCmdPushConstants vkCmdPushConstants;
 extern PFN_vkCmdSetBlendConstants vkCmdSetBlendConstants;
+extern PFN_vkCmdSetDepthBounds vkCmdSetDepthBounds;
 extern PFN_vkCmdSetScissor vkCmdSetScissor;
 extern PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask;
 extern PFN_vkCmdSetStencilReference vkCmdSetStencilReference;

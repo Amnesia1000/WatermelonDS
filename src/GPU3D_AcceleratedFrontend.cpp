@@ -424,6 +424,7 @@ void BuildAcceleratedScene(
         return (polygonYTop & 0xFFFFu) | ((polygonYBot & 0xFFFFu) << 16u);
     };
 
+    std::vector<u16> polygonVertexIndices{};
     for (u32 polygonIndex = 0; polygonIndex < renderPolygonCount; polygonIndex++)
     {
         const Polygon* polygon = gpu3d.RenderPolygonRAM[polygonIndex];
@@ -523,7 +524,7 @@ void BuildAcceleratedScene(
                 expandedY);
         }
 
-        std::vector<u16> polygonVertexIndices{};
+        polygonVertexIndices.clear();
         polygonVertexIndices.reserve(std::max<u32>(polygon->NumVertices + 1u, 3u));
 
         const auto resolveFixedCoords = [&](u32 vertexIndex) -> std::pair<s32, s32> {

@@ -27,10 +27,17 @@
 
 #include <algorithm>
 #include <cmath>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
+#include <functional>
 #include <limits>
 #include <optional>
+#include <system_error>
+#include <thread>
+#if defined(__ANDROID__) || defined(__linux__)
+#include <pthread.h>
+#endif
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -633,14 +640,20 @@ constexpr GraphicsRasterDispatchPolicy kGraphicsRasterDispatchPolicy{
 
 }
 
-std::unique_ptr<VulkanRenderer3D> VulkanRenderer3D::New() noexcept
+std::unique_ptr<VulkanRenderer3D> VulkanRenderer3D::New(
+    ThreadLifecycleScope::Callback workerLifecycle,
+    ThreadLifecycleScope::Callback workerCreationLifecycle) noexcept
 {
-    return std::make_unique<VulkanRenderer3D>();
+    return std::make_unique<VulkanRenderer3D>(workerLifecycle, workerCreationLifecycle);
 }
 
-VulkanRenderer3D::VulkanRenderer3D() noexcept
+VulkanRenderer3D::VulkanRenderer3D(
+    ThreadLifecycleScope::Callback workerLifecycle,
+    ThreadLifecycleScope::Callback workerCreationLifecycle) noexcept
     : Renderer3D(true)
     , Texcache(TexcacheVulkanLoader())
+    , WorkerLifecycle(workerLifecycle)
+    , WorkerCreationLifecycle(workerCreationLifecycle)
 {
     beginRenderProductEpoch();
     clearLineCache();
@@ -681,13 +694,230 @@ bool VulkanRenderer3D::hasRetainedRenderProducts() const noexcept
     return false;
 }
 
+struct VulkanRenderer3D::FramePreparation
+{
+    struct Inputs
+    {
+        GPU* Gpu = nullptr;
+        bool TextureCacheChanged = false;
+        bool PrefetchNativeForCompose = false;
+        u32 CaptureCnt = 0;
+        u32 DisplayCnt = 0;
+        u64 RenderStartNs = 0;
+        const GPU3D* Geometry = nullptr;
+        std::array<AcceleratedSceneBuildConfig, 2> SceneConfigs{};
+        u32 SceneCount = 0;
+    };
+
+    std::mutex Mutex;
+    std::condition_variable WorkAvailable;
+    std::condition_variable WorkComplete;
+    Inputs Pending;
+    bool Stopping = false;
+    const GPU3D* PreparedGpu = nullptr;
+    u32 PreparedPolygonCount = 0;
+    u32 PreparedMask = 0;
+    std::array<AcceleratedSceneBuildConfig, 2> PreparedConfigs{};
+    std::array<AcceleratedScene, 2> PreparedScenes;
+    std::thread Worker;
+
+    bool HasPending() const
+    {
+        return Pending.Gpu != nullptr || Pending.Geometry != nullptr;
+    }
+
+    explicit FramePreparation(VulkanRenderer3D& renderer)
+        : Worker([this, &renderer, lifecycle = renderer.WorkerLifecycle]() {
+#if defined(__ANDROID__) || defined(__linux__)
+            pthread_setname_np(pthread_self(), "VulkanPrepare");
+#endif
+            ThreadLifecycleScope hints(lifecycle);
+            std::unique_lock lock(Mutex);
+            for (;;)
+            {
+                WorkAvailable.wait(lock, [this]() { return Stopping || HasPending(); });
+                if (Stopping)
+                    return;
+                const Inputs inputs = Pending;
+                lock.unlock();
+                if (inputs.Geometry != nullptr)
+                {
+                    PreparedGpu = inputs.Geometry;
+                    PreparedPolygonCount = inputs.Geometry->RenderNumPolygons;
+                    PreparedConfigs = inputs.SceneConfigs;
+                    PreparedMask = 0;
+                    for (u32 i = 0; i < inputs.SceneCount; ++i)
+                    {
+                        const u64 startNs = PerfNowNs();
+                        BuildAcceleratedScene(*inputs.Geometry, inputs.SceneConfigs[i], PreparedScenes[i]);
+                        renderer.GraphicsSceneBuildCpuWindow.Add(PerfNowNs() - startNs);
+                        PreparedMask |= 1u << i;
+                    }
+                }
+                else
+                {
+                    renderer.renderPreparedFrame(*inputs.Gpu, inputs.TextureCacheChanged,
+                        inputs.PrefetchNativeForCompose, inputs.CaptureCnt,
+                        inputs.DisplayCnt, inputs.RenderStartNs, true);
+                }
+                lock.lock();
+                Pending = {};
+                WorkComplete.notify_all();
+            }
+        })
+    {
+    }
+
+    ~FramePreparation()
+    {
+        {
+            std::unique_lock lock(Mutex);
+            WorkComplete.wait(lock, [this]() { return !HasPending(); });
+            Stopping = true;
+        }
+        WorkAvailable.notify_one();
+        Worker.join();
+    }
+
+    void Finish()
+    {
+        std::unique_lock lock(Mutex);
+        WorkComplete.wait(lock, [this]() { return !HasPending(); });
+    }
+
+    void DiscardGeometry()
+    {
+        PreparedGpu = nullptr;
+        PreparedMask = 0;
+    }
+
+    bool TakeScene(const GPU3D& gpu, const AcceleratedSceneBuildConfig& config,
+        AcceleratedScene& scene)
+    {
+        if (PreparedGpu != &gpu || PreparedPolygonCount != gpu.RenderNumPolygons)
+            return false;
+        for (u32 i = 0; i < PreparedScenes.size(); ++i)
+        {
+            if ((PreparedMask & (1u << i)) == 0)
+                continue;
+            const auto& previous = PreparedConfigs[i];
+            const auto& a = previous.CoverageFix;
+            const auto& b = config.CoverageFix;
+            if (previous.Scale != config.Scale
+                || previous.BetterPolygons != config.BetterPolygons
+                || previous.UseHiresCoordinates != config.UseHiresCoordinates
+                || previous.MaxFixedX != config.MaxFixedX || previous.MaxFixedY != config.MaxFixedY
+                || a.Enabled != b.Enabled || a.UserPx != b.UserPx
+                || a.ApplyRepeat != b.ApplyRepeat || a.ApplyClamp != b.ApplyClamp
+                || a.PassiveRepeatPx != b.PassiveRepeatPx
+                || a.DisablePassiveRepeat != b.DisablePassiveRepeat
+                || a.PaletteUiClampEnabled != b.PaletteUiClampEnabled
+                || a.PaletteUiClampPx != b.PaletteUiClampPx)
+                continue;
+            std::swap(scene, PreparedScenes[i]);
+            PreparedMask &= ~(1u << i);
+            return true;
+        }
+        return false;
+    }
+
+    void Submit(const Inputs& inputs)
+    {
+        {
+            std::lock_guard lock(Mutex);
+            Pending = inputs;
+        }
+        WorkAvailable.notify_one();
+    }
+};
+
+void VulkanRenderer3D::SetFramePreparationDeferred(bool enabled) noexcept
+{
+    if (!enabled)
+    {
+        FinishFramePreparation();
+        if (Preparation != nullptr)
+            Preparation->DiscardGeometry();
+    }
+    FramePreparationDeferred = enabled;
+}
+
+bool VulkanRenderer3D::ensureFramePreparation() noexcept
+{
+    if (FramePreparationUnavailable)
+        return false;
+    if (Preparation == nullptr)
+    {
+        try
+        {
+            ThreadLifecycleScope creation(WorkerCreationLifecycle);
+            Preparation = std::make_unique<FramePreparation>(*this);
+        }
+        catch (const std::system_error& error)
+        {
+            FramePreparationUnavailable = true;
+            Log(LogLevel::Error, "VulkanRenderer3D: preparation worker unavailable (%s)", error.what());
+        }
+    }
+    return Preparation != nullptr;
+}
+
+void VulkanRenderer3D::PrepareFrameGeometry(const GPU3D& gpu) noexcept
+{
+    if (!Threaded || !FramePreparationDeferred || !Initialized
+        || FrameskipSaltoPendiente || gpu.RenderFrameIdentical || gpu.RenderNumPolygons == 0u
+        || gpu.RenderNumPolygons > gpu.RenderPolygonRAM.size())
+        return;
+    const Vertex* vertexBegin = gpu.VertexRAM + (gpu.CurRAMBank ? 0u : 6144u);
+    const Polygon* polygonBegin = gpu.PolygonRAM + (gpu.CurRAMBank ? 0u : 2048u);
+    const std::less<const Vertex*> vertexBefore;
+    const std::less<const Polygon*> polygonBefore;
+    for (u32 i = 0; i < gpu.RenderNumPolygons; ++i)
+    {
+        const Polygon* polygon = gpu.RenderPolygonRAM[i];
+        if (polygon == nullptr
+            || polygonBefore(polygon, polygonBegin) || !polygonBefore(polygon, polygonBegin + 2048u)
+            || polygon->NumVertices > std::size(polygon->Vertices))
+            return;
+        for (u32 j = 0; j < polygon->NumVertices; ++j)
+        {
+            const Vertex* vertex = polygon->Vertices[j];
+            if (vertex == nullptr
+                || vertexBefore(vertex, vertexBegin) || !vertexBefore(vertex, vertexBegin + 6144u))
+                return;
+        }
+    }
+    if (!ensureFramePreparation())
+        return;
+    FramePreparation::Inputs inputs{};
+    inputs.Geometry = &gpu;
+    inputs.SceneConfigs[0] = sceneBuildConfigForScale(1);
+    inputs.SceneCount = 1;
+    if (ScaleFactor > 1)
+    {
+        inputs.SceneConfigs[1] = sceneBuildConfigForScale(ScaleFactor);
+        inputs.SceneCount = 2;
+    }
+    Preparation->Submit(inputs);
+}
+
+void VulkanRenderer3D::FinishFramePreparation() const noexcept
+{
+    if (Preparation != nullptr)
+        Preparation->Finish();
+}
+
 VulkanRenderer3D::~VulkanRenderer3D()
 {
+    Preparation.reset();
     destroyVulkan();
 }
 
 void VulkanRenderer3D::Reset(GPU& gpu)
 {
+    FinishFramePreparation();
+    if (Preparation != nullptr)
+        Preparation->DiscardGeometry();
     (void)SetFrameSubmissionDeferred(false);
     (void)gpu;
     beginRenderProductEpoch();
@@ -737,12 +967,43 @@ void VulkanRenderer3D::Reset(GPU& gpu)
 
 void VulkanRenderer3D::VCount144(GPU& gpu)
 {
+    FinishFramePreparation();
+    if (Preparation != nullptr)
+        Preparation->DiscardGeometry();
     (void)gpu;
     SkipRenderAtVCount215 = false;
 }
 
+bool VulkanRenderer3D::SetSubmissionDependency(SubmissionDependency callback, void* context)
+{
+    FinishFramePreparation();
+    if (!flushSubmissionDependency())
+        return false;
+    BeforeSubmission = callback;
+    BeforeSubmissionContext = context;
+    return true;
+}
+
+bool VulkanRenderer3D::flushSubmissionDependency()
+{
+    const auto callback = std::exchange(BeforeSubmission, nullptr);
+    void* const context = std::exchange(BeforeSubmissionContext, nullptr);
+    if (callback != nullptr && !callback(context))
+        SubmissionDependencyFailed = true;
+    return !SubmissionDependencyFailed;
+}
+
+VkResult VulkanRenderer3D::submitQueue(const VkSubmitInfo& submit, VkFence fence)
+{
+    if (!flushSubmissionDependency())
+        return VK_ERROR_UNKNOWN;
+    std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
+    return vkQueueSubmit(Queue, 1, &submit, fence);
+}
+
 bool VulkanRenderer3D::SetFrameSubmissionDeferred(bool enabled, VkSemaphore dependency, u64 value)
 {
+    FinishFramePreparation();
     if (enabled)
     {
         if (FrameSubmissionDeferred || DeferredRenderContext != nullptr
@@ -777,9 +1038,7 @@ bool VulkanRenderer3D::flushDeferredRenderSubmission(VkSemaphore dependency, u64
         submit.pWaitDstStageMask = &waitStage;
     }
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        DeferredRenderSubmitResult = vkQueueSubmit(
-            Queue, 1, &submit, context->FrameFence);
+        DeferredRenderSubmitResult = submitQueue(submit, context->FrameFence);
     }
     if (DeferredRenderSubmitResult != VK_SUCCESS)
     {
@@ -792,6 +1051,7 @@ bool VulkanRenderer3D::flushDeferredRenderSubmission(VkSemaphore dependency, u64
 
 void VulkanRenderer3D::RenderFrame(GPU& gpu)
 {
+    FinishFramePreparation();
     if (!flushDeferredRenderSubmission())
         return;
     CapturaExactaEsteFotograma = false;
@@ -843,11 +1103,6 @@ void VulkanRenderer3D::RenderFrame(GPU& gpu)
     PendingSubmitCaptureCnt = gpu.GPU2D_A.CaptureCnt;
 
     const u64 renderStartNs = PerfNowNs();
-    auto renderPerfScope = MakeScopeExit([&]() {
-        RenderCpuWindow.Add(PerfNowNs() - renderStartNs);
-        logPerformanceIfNeeded();
-    });
-
     const u64 textureUpdateStartNs = PerfNowNs();
     bool textureCacheInvalidated = false;
     const auto eraseResolvedTextureCacheKey = [&](u64 invalidatedTexcacheKey) {
@@ -872,17 +1127,35 @@ void VulkanRenderer3D::RenderFrame(GPU& gpu)
         WarmTextureCpuWindow.Add(0);
     }
 
+    if (Threaded && FramePreparationDeferred && gpu.VCount == 215u
+        && ensureFramePreparation())
+    {
+        Preparation->Submit({&gpu, textureCacheChanged, prefetchNativeForCompose,
+            gpu.GPU2D_A.CaptureCnt, gpu.GPU2D_A.DispCnt, renderStartNs});
+        return;
+    }
+    renderPreparedFrame(gpu, textureCacheChanged, prefetchNativeForCompose,
+        gpu.GPU2D_A.CaptureCnt, gpu.GPU2D_A.DispCnt, renderStartNs);
+}
+
+void VulkanRenderer3D::renderPreparedFrame(GPU& gpu, bool textureCacheChanged,
+    bool prefetchNativeForCompose, u32 captureCnt, u32 displayCnt, u64 renderStartNs,
+    bool usePreparedGeometry)
+{
+    auto renderPerfScope = MakeScopeExit([&]() {
+        RenderCpuWindow.Add(PerfNowNs() - renderStartNs);
+        logPerformanceIfNeeded();
+    });
     const u32 scale = static_cast<u32>(std::max(1, ScaleFactor));
     const u32 targetWidth = 256u * scale;
     const u32 targetHeight = 192u * scale;
-    const u32 captureCnt = gpu.GPU2D_A.CaptureCnt;
     const bool captureEnabled = (captureCnt & (1u << 31u)) != 0u;
     const u32 captureMode = (captureCnt >> 29u) & 0x3u;
     const u32 captureSizeMode = (captureCnt >> 20u) & 0x3u;
     const bool captureSource3d = (captureCnt & (1u << 24u)) != 0u;
     const bool sourceAContributes = captureMode == 0u
         || ((captureMode >= 2u) && ((captureCnt & 0x1Fu) != 0u));
-    const bool bg0Uses3d = (gpu.GPU2D_A.DispCnt & 0x0108u) == 0x0108u;
+    const bool bg0Uses3d = (displayCnt & 0x0108u) == 0x0108u;
 
     if (!captureEnabled)
     {
@@ -1067,12 +1340,12 @@ void VulkanRenderer3D::RenderFrame(GPU& gpu)
         scale > 1u
         && (captureNeedsGpuCaptureLine || prefetchNativeForCompose
             || gpu.GPU3D.RenderNumPolygons != 0u)
-        && submitFaithfulNativeProjection(gpu);
+        && submitFaithfulNativeProjection(gpu, usePreparedGeometry);
     if (eagerNativeProjectionSubmitted && prefetchNativeForCompose)
         NativeComposePrefetchCount++;
 
     const u64 triangleBuildStartNs = PerfNowNs();
-    buildTriangleList(gpu);
+    buildTriangleList(gpu, usePreparedGeometry);
     TriangleBuildCpuWindow.Add(PerfNowNs() - triangleBuildStartNs);
 
     const bool hasExecutableRasterWork =
@@ -1284,6 +1557,7 @@ void VulkanRenderer3D::RestartFrame(GPU& gpu)
 
 u32* VulkanRenderer3D::GetLine(int line)
 {
+    FinishFramePreparation();
 
     static const bool logGetLine = getenv("MELON_LOG_TAIL") != nullptr;
     if (logGetLine && line == 0)
@@ -1392,7 +1666,7 @@ void VulkanRenderer3D::traceFaithfulCaptureDecision(
         CaptureLineReady ? 1 : 0);
 }
 
-bool VulkanRenderer3D::submitFaithfulNativeProjection(GPU& gpu)
+bool VulkanRenderer3D::submitFaithfulNativeProjection(GPU& gpu, bool usePreparedGeometry)
 {
     if (ScaleFactor <= 1
         || CaptureLinePending
@@ -1424,7 +1698,7 @@ bool VulkanRenderer3D::submitFaithfulNativeProjection(GPU& gpu)
     });
 
     const u64 nativeBuildStartNs = PerfNowNs();
-    buildTriangleList(gpu);
+    buildTriangleList(gpu, usePreparedGeometry);
     TriangleBuildCpuWindow.Add(PerfNowNs() - nativeBuildStartNs);
 
     const bool nativeResourcesReady =
@@ -1633,6 +1907,7 @@ void VulkanRenderer3D::SetupAccelFrame()
 
 void VulkanRenderer3D::PrepareCaptureFrame()
 {
+    FinishFramePreparation();
     CapturePrepareRequestCount++;
 
     HasCpuFrame = ExactCaptureLineCachePrepared
@@ -1641,6 +1916,7 @@ void VulkanRenderer3D::PrepareCaptureFrame()
 
 void VulkanRenderer3D::SetCaptureScreenSwapHint(bool screenSwap, u32 captureCnt, u32 displayCnt)
 {
+    FinishFramePreparation();
 
     CapturaExactaEsteFotograma = true;
     CurrentCaptureScreenSwapHint = screenSwap;
@@ -1685,6 +1961,7 @@ void VulkanRenderer3D::SetCaptureScreenSwapHint(bool screenSwap, u32 captureCnt,
 
 void VulkanRenderer3D::BeginCaptureFrame()
 {
+    FinishFramePreparation();
 
     if (!ExactCaptureLineCachePrepared)
         HasCpuFrame = false;
@@ -1707,6 +1984,7 @@ void VulkanRenderer3D::BeginCaptureFrame()
 
 void VulkanRenderer3D::Blit(const GPU& gpu)
 {
+    FinishFramePreparation();
     CurrentRenderScreenSwap = gpu.GPU3D.RenderScreenSwapAt3D;
 
     if (!Initialized
@@ -1748,6 +2026,7 @@ void VulkanRenderer3D::Blit(const GPU& gpu)
 
 void VulkanRenderer3D::Stop(const GPU& gpu)
 {
+    Preparation.reset();
     (void)gpu;
 
     destroyVulkan();
@@ -1889,6 +2168,7 @@ void VulkanRenderer3D::SetRenderSettings(
 
 void VulkanRenderer3D::SetThreaded(bool threaded, GPU& gpu) noexcept
 {
+    FinishFramePreparation();
     (void)gpu;
     const bool enableThreaded = threaded;
     if (Threaded == enableThreaded)
@@ -1906,6 +2186,8 @@ void VulkanRenderer3D::SetThreaded(bool threaded, GPU& gpu) noexcept
         (void)waitForDeviceIdle("threaded mode change");
 
     Threaded = enableThreaded;
+    if (!Threaded)
+        Preparation.reset();
     NextRenderContextIndex = 0;
     PublishedGraphicsRenderContext = nullptr;
     InvalidatePresentationState(false);
@@ -2474,7 +2756,8 @@ bool VulkanRenderer3D::ensureInitialized()
 
 void VulkanRenderer3D::destroyVulkan()
 {
-    (void)SetFrameSubmissionDeferred(false);
+    FrameSubmissionDeferred = false;
+    (void)flushDeferredRenderSubmission();
     if (Device != VK_NULL_HANDLE)
         (void)waitForDeviceIdle("renderer destruction");
 
@@ -2626,6 +2909,15 @@ void VulkanRenderer3D::destroyVulkan()
         }
     }
 
+    for (VkPipeline& pipeline : GraphicsBoundedDepthTranslucentPipelines)
+    {
+        if (pipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(Device, pipeline, nullptr);
+            pipeline = VK_NULL_HANDLE;
+        }
+    }
+
     for (VkPipeline& pipeline : GraphicsTranslucentFastModulatePlainFragmentDepthPipelines)
     {
         if (pipeline != VK_NULL_HANDLE)
@@ -2636,6 +2928,15 @@ void VulkanRenderer3D::destroyVulkan()
     }
 
     for (VkPipeline& pipeline : GraphicsBgZeroTranslucentPipelines)
+    {
+        if (pipeline != VK_NULL_HANDLE)
+        {
+            vkDestroyPipeline(Device, pipeline, nullptr);
+            pipeline = VK_NULL_HANDLE;
+        }
+    }
+
+    for (VkPipeline& pipeline : GraphicsBoundedDepthBgZeroTranslucentPipelines)
     {
         if (pipeline != VK_NULL_HANDLE)
         {
@@ -3678,6 +3979,8 @@ bool VulkanRenderer3D::finalizeCaptureLineFrame(bool blocking)
 bool VulkanRenderer3D::waitForDeviceIdle(const char* reason)
 {
     if (!flushDeferredRenderSubmission())
+        return false;
+    if (!flushSubmissionDependency())
         return false;
     if (Device == VK_NULL_HANDLE)
         return false;
@@ -5006,7 +5309,8 @@ bool VulkanRenderer3D::createGraphicsPipelines()
                                     VkCompareOp stencilCompareOp,
                                     VkPipeline* outPipeline,
                                     VkPrimitiveTopology topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                                    bool depthTestEnable = true) -> bool {
+                                    bool depthTestEnable = true,
+                                    bool depthBoundsTestEnable = false) -> bool {
         VkPipelineShaderStageCreateInfo shaderStages[2]{};
         shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
@@ -5070,6 +5374,7 @@ bool VulkanRenderer3D::createGraphicsPipelines()
         VkPipelineDepthStencilStateCreateInfo depthStencilState{};
         depthStencilState.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
         depthStencilState.depthTestEnable = depthTestEnable ? VK_TRUE : VK_FALSE;
+        depthStencilState.depthBoundsTestEnable = depthBoundsTestEnable ? VK_TRUE : VK_FALSE;
         depthStencilState.depthWriteEnable = depthWriteEnable ? VK_TRUE : VK_FALSE;
         depthStencilState.depthCompareOp = depthCompareOp;
         depthStencilState.stencilTestEnable = stencilTestEnable ? VK_TRUE : VK_FALSE;
@@ -5083,17 +5388,18 @@ bool VulkanRenderer3D::createGraphicsPipelines()
             : static_cast<u32>(blendAttachments.size());
         colorBlendState.pAttachments = blendAttachments.data();
 
-        const std::array<VkDynamicState, 5> dynamicStates = {
+        const std::array<VkDynamicState, 6> dynamicStates = {
             VK_DYNAMIC_STATE_VIEWPORT,
             VK_DYNAMIC_STATE_SCISSOR,
             VK_DYNAMIC_STATE_STENCIL_COMPARE_MASK,
             VK_DYNAMIC_STATE_STENCIL_WRITE_MASK,
             VK_DYNAMIC_STATE_STENCIL_REFERENCE,
+            VK_DYNAMIC_STATE_DEPTH_BOUNDS,
         };
 
         VkPipelineDynamicStateCreateInfo dynamicState{};
         dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-        dynamicState.dynamicStateCount = static_cast<u32>(dynamicStates.size());
+        dynamicState.dynamicStateCount = depthBoundsTestEnable ? 6u : 5u;
         dynamicState.pDynamicStates = dynamicStates.data();
 
         VkGraphicsPipelineCreateInfo pipelineCreateInfo{};
@@ -6143,6 +6449,26 @@ bool VulkanRenderer3D::createGraphicsPipelines()
                         return false;
                     }
 
+                    if (wMode == 0u && depthCompareMode != 0u
+                        && VulkanContext::Get().SupportsDepthBounds()
+                        && !createRasterPipeline(
+                            translucentFragModule,
+                            &translucentSpecializationInfo,
+                            translucentBlendAttachments,
+                            depthWriteMode != 0u,
+                            VK_COMPARE_OP_ALWAYS,
+                            true,
+                            VK_STENCIL_OP_KEEP,
+                            VK_STENCIL_OP_KEEP,
+                            VK_STENCIL_OP_REPLACE,
+                            VK_COMPARE_OP_NOT_EQUAL,
+                            &GraphicsBoundedDepthTranslucentPipelines[makeTranslucentIndex(wMode, depthCompareMode, depthWriteMode, fogWriteMode, 1u)],
+                            VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true, true))
+                    {
+                        Log(LogLevel::Error, "VulkanRenderer3D: failed to create bounded-depth graphics translucent pipeline");
+                        return false;
+                    }
+
                     if (wMode != 0u
                         && useFastModulatePlainFragmentDepth
                         && !createRasterPipeline(
@@ -6179,6 +6505,26 @@ bool VulkanRenderer3D::createGraphicsPipelines()
                         return false;
                     }
 
+                    if (wMode == 0u && depthCompareMode != 0u
+                        && VulkanContext::Get().SupportsDepthBounds()
+                        && !createRasterPipeline(
+                            translucentFragModule,
+                            &translucentSpecializationInfo,
+                            translucentReplaceBlendAttachments,
+                            depthWriteMode != 0u,
+                            VK_COMPARE_OP_ALWAYS,
+                            true,
+                            VK_STENCIL_OP_KEEP,
+                            VK_STENCIL_OP_KEEP,
+                            VK_STENCIL_OP_REPLACE,
+                            VK_COMPARE_OP_NOT_EQUAL,
+                            &GraphicsBoundedDepthTranslucentPipelines[makeTranslucentIndex(wMode, depthCompareMode, depthWriteMode, fogWriteMode, 0u)],
+                            VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true, true))
+                    {
+                        Log(LogLevel::Error, "VulkanRenderer3D: failed to create bounded-depth graphics translucent-replace pipeline");
+                        return false;
+                    }
+
                     if (!createRasterPipeline(
                             translucentFragModule,
                             &translucentSpecializationInfo,
@@ -6193,6 +6539,26 @@ bool VulkanRenderer3D::createGraphicsPipelines()
                             &GraphicsBgZeroTranslucentPipelines[makeBgZeroTranslucentIndex(wMode, depthCompareMode, depthWriteMode, fogWriteMode)]))
                     {
                         Log(LogLevel::Error, "VulkanRenderer3D: failed to create graphics bg-zero translucent pipeline");
+                        return false;
+                    }
+
+                    if (wMode == 0u && depthCompareMode != 0u
+                        && VulkanContext::Get().SupportsDepthBounds()
+                        && !createRasterPipeline(
+                            translucentFragModule,
+                            &translucentSpecializationInfo,
+                            bgZeroTranslucentBlendAttachments,
+                            depthWriteMode != 0u,
+                            VK_COMPARE_OP_ALWAYS,
+                            true,
+                            VK_STENCIL_OP_KEEP,
+                            VK_STENCIL_OP_KEEP,
+                            VK_STENCIL_OP_INVERT,
+                            VK_COMPARE_OP_EQUAL,
+                            &GraphicsBoundedDepthBgZeroTranslucentPipelines[makeBgZeroTranslucentIndex(wMode, depthCompareMode, depthWriteMode, fogWriteMode)],
+                            VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true, true))
+                    {
+                        Log(LogLevel::Error, "VulkanRenderer3D: failed to create bounded-depth graphics bg-zero translucent pipeline");
                         return false;
                     }
 
@@ -8023,8 +8389,7 @@ bool VulkanRenderer3D::createFallbackTexture()
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &CommandBuffer;
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        const VkResult submitResult = vkQueueSubmit(Queue, 1, &submitInfo, FrameFence);
+        const VkResult submitResult = submitQueue(submitInfo, FrameFence);
         if (submitResult != VK_SUCCESS)
         {
             Log(LogLevel::Error, "VulkanRenderer3D: fallback texture vkQueueSubmit failed (%d)", static_cast<int>(submitResult));
@@ -8904,9 +9269,7 @@ bool VulkanRenderer3D::dispatchPlainRearPlaneOnly(
     if (vkResetFences(Device, 1, &frameFence) != VK_SUCCESS)
         return false;
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        const VkResult submitResult =
-            vkQueueSubmit(Queue, 1, &submitInfo, frameFence);
+        const VkResult submitResult = submitQueue(submitInfo, frameFence);
         if (submitResult != VK_SUCCESS)
         {
             Log(
@@ -10388,6 +10751,13 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
         }
 
         bindGraphicsPipelineCached(pipeline);
+        if (draw.boundedEqualDepth != 0xFFFFFFFFu)
+        {
+            const u32 depth = draw.boundedEqualDepth;
+            const float lower = static_cast<float>(depth > 512u ? depth - 512u : 0u) / 16777216.0f;
+            const float upper = static_cast<float>(std::min(depth + 512u, 0xFFFFFFu)) / 16777216.0f;
+            vkCmdSetDepthBounds(commandBuffer, lower, upper);
+        }
         const TriangleGpu& firstTriangle = Triangles[draw.firstTriangle];
         bindGraphicsDescriptorSetCached(firstTriangle.texArrayIndex);
         pushConstants.depthBlendMode = draw.polyAttr;
@@ -11761,9 +12131,12 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
             else
             {
                 const u32 pipelineIndex = bgZeroTranslucentPipelineIndexFor(draw, fogWrite);
-                VkPipeline pipeline = fastBgZeroModulatePlainPipelineFor(draw, pipelineIndex);
-                const bool specialized = pipeline != VK_NULL_HANDLE;
-                if (!specialized)
+                const bool boundedDepth = draw.boundedEqualDepth != 0xFFFFFFFFu;
+                VkPipeline pipeline = boundedDepth
+                    ? GraphicsBoundedDepthBgZeroTranslucentPipelines[pipelineIndex]
+                    : fastBgZeroModulatePlainPipelineFor(draw, pipelineIndex);
+                const bool specialized = !boundedDepth && pipeline != VK_NULL_HANDLE;
+                if (!boundedDepth && !specialized)
                 {
                     pipeline = pipelineIndex < GraphicsBgZeroTranslucentPipelines.size()
                         ? GraphicsBgZeroTranslucentPipelines[pipelineIndex]
@@ -11925,11 +12298,11 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
                 draw,
                 fogWrite,
                 alphaBlendEnabled && !replaceTransparentDestination);
-            VkPipeline pipeline = fastTranslucentModulatePlainPipelineFor(
-                draw,
-                pipelineIndex,
-                replaceTransparentDestination);
-            if (pipeline == VK_NULL_HANDLE)
+            const bool boundedDepth = draw.boundedEqualDepth != 0xFFFFFFFFu;
+            VkPipeline pipeline = boundedDepth
+                ? GraphicsBoundedDepthTranslucentPipelines[pipelineIndex]
+                : fastTranslucentModulatePlainPipelineFor(draw, pipelineIndex, replaceTransparentDestination);
+            if (!boundedDepth && pipeline == VK_NULL_HANDLE)
             {
                 pipeline = pipelineIndex < GraphicsTranslucentPipelines.size()
                     ? GraphicsTranslucentPipelines[pipelineIndex]
@@ -12761,8 +13134,7 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
     }
     else
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        const VkResult submitResult = vkQueueSubmit(Queue, 1, &submitInfo, frameFence);
+        const VkResult submitResult = submitQueue(submitInfo, frameFence);
         if (submitResult != VK_SUCCESS)
         {
             Log(LogLevel::Error, "VulkanRenderer3D: graphics vkQueueSubmit failed (%d)", static_cast<int>(submitResult));
@@ -13125,8 +13497,7 @@ bool VulkanRenderer3D::submitGraphicsCaptureExportForCurrentFrame()
         return false;
     }
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        const VkResult submitResult = vkQueueSubmit(Queue, 1, &submitInfo, FrameFence);
+        const VkResult submitResult = submitQueue(submitInfo, FrameFence);
         if (submitResult != VK_SUCCESS)
         {
             traceFaithfulCaptureDecision(
@@ -13253,8 +13624,7 @@ bool VulkanRenderer3D::readbackGraphicsAttrImageToCpu(std::vector<u32>& outAttrP
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &CommandBuffer;
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        if (vkQueueSubmit(Queue, 1, &submitInfo, FrameFence) != VK_SUCCESS)
+        if (submitQueue(submitInfo, FrameFence) != VK_SUCCESS)
             return false;
     }
     if (vkWaitForFences(Device, 1, &FrameFence, VK_TRUE, kFenceWaitTimeoutNs) != VK_SUCCESS)
@@ -13427,8 +13797,7 @@ bool VulkanRenderer3D::readbackColorTargetToCpu()
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &CommandBuffer;
     {
-        std::scoped_lock queueLock(VulkanContext::Get().GetQueueLock());
-        const VkResult submitResult = vkQueueSubmit(Queue, 1, &submitInfo, FrameFence);
+        const VkResult submitResult = submitQueue(submitInfo, FrameFence);
         if (submitResult != VK_SUCCESS)
         {
             Log(LogLevel::Error, "VulkanRenderer3D: readback vkQueueSubmit failed (%d)", static_cast<int>(submitResult));
@@ -13454,7 +13823,28 @@ bool VulkanRenderer3D::readbackColorTargetToCpu()
 }
 
 
-void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
+AcceleratedSceneBuildConfig VulkanRenderer3D::sceneBuildConfigForScale(int scale) const
+{
+    const u32 scaleFactor = static_cast<u32>(std::max(1, scale));
+    AcceleratedSceneBuildConfig config{};
+    config.Scale = static_cast<int>(scaleFactor);
+    config.BetterPolygons = BetterPolygons;
+    config.UseHiresCoordinates = true;
+    config.MaxFixedX = static_cast<s32>((256u * scaleFactor * 16u) - 1u);
+    config.MaxFixedY = static_cast<s32>((192u * scaleFactor * 16u) - 1u);
+    config.CoverageFix.Enabled = CoverageFixEnabled;
+    config.CoverageFix.UserPx = CoverageFixPx;
+    config.CoverageFix.ApplyRepeat = CoverageFixApplyRepeat;
+    config.CoverageFix.ApplyClamp = CoverageFixApplyClamp;
+    config.CoverageFix.PassiveRepeatPx = PassiveCoverageFixRepeatPx;
+    config.CoverageFix.DisablePassiveRepeat =
+        (MelonDSAndroid::getVulkanDiagnosticFlags() & kVulkanDiagnosticDisablePassiveRepeatCoverageExpand) != 0u;
+    config.CoverageFix.PaletteUiClampEnabled = false;
+    config.CoverageFix.PaletteUiClampPx = 0.5f;
+    return config;
+}
+
+void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeometry)
 {
     const VulkanTextureDescriptorPolicy texturePolicy = getTextureDescriptorPolicy();
     const u32 maxActiveTextureDescriptors = texturePolicy.MaxActiveTextureDescriptors();
@@ -13497,29 +13887,18 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
     const float maxTargetY = 192.0f * scale;
     const bool textureMapsEnabled = (gpu.GPU3D.RenderDispCnt & (1u << 0u)) != 0u;
     const bool highlightEnabled = (gpu.GPU3D.RenderDispCnt & (1u << 1u)) != 0u;
-    const bool disablePassiveRepeatCoverageExpand =
-        (MelonDSAndroid::getVulkanDiagnosticFlags() & kVulkanDiagnosticDisablePassiveRepeatCoverageExpand) != 0u;
     const float coverageDepthBias = CoverageFixDepthBias * 16777215.0f;
 
-    AcceleratedSceneBuildConfig sceneBuildConfig{};
-    sceneBuildConfig.Scale = std::max(1, EscalaEfectiva);
-    sceneBuildConfig.BetterPolygons = BetterPolygons;
-    sceneBuildConfig.UseHiresCoordinates = true;
-    sceneBuildConfig.MaxFixedX = static_cast<s32>((256u * scaleFactor * 16u) - 1u);
-    sceneBuildConfig.MaxFixedY = static_cast<s32>((192u * scaleFactor * 16u) - 1u);
-    sceneBuildConfig.CoverageFix.Enabled = CoverageFixEnabled;
-    sceneBuildConfig.CoverageFix.UserPx = CoverageFixPx;
-    sceneBuildConfig.CoverageFix.ApplyRepeat = CoverageFixApplyRepeat;
-    sceneBuildConfig.CoverageFix.ApplyClamp = CoverageFixApplyClamp;
-    sceneBuildConfig.CoverageFix.PassiveRepeatPx = PassiveCoverageFixRepeatPx;
-    sceneBuildConfig.CoverageFix.DisablePassiveRepeat = disablePassiveRepeatCoverageExpand;
-    sceneBuildConfig.CoverageFix.PaletteUiClampEnabled = false;
-    sceneBuildConfig.CoverageFix.PaletteUiClampPx = 0.5f;
+    const AcceleratedSceneBuildConfig sceneBuildConfig = sceneBuildConfigForScale(EscalaEfectiva);
 
     const bool perPolygonTiming = MelonDSAndroid::areRendererDebugToolsEnabled();
-    const u64 sceneBuildCpuStartNs = PerfNowNs();
-    BuildAcceleratedScene(gpu.GPU3D, sceneBuildConfig, SharedGraphicsScene);
-    GraphicsSceneBuildCpuWindow.Add(PerfNowNs() - sceneBuildCpuStartNs);
+    if (!usePreparedGeometry || Preparation == nullptr
+        || !Preparation->TakeScene(gpu.GPU3D, sceneBuildConfig, SharedGraphicsScene))
+    {
+        const u64 sceneBuildCpuStartNs = PerfNowNs();
+        BuildAcceleratedScene(gpu.GPU3D, sceneBuildConfig, SharedGraphicsScene);
+        GraphicsSceneBuildCpuWindow.Add(PerfNowNs() - sceneBuildCpuStartNs);
+    }
 
     const size_t estimatedTriangleCount =
         SharedGraphicsScene.Triangles.size() + (SharedGraphicsScene.Draws.size() * 2u);
@@ -13647,6 +14026,7 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
     constexpr u32 kTriangleFlagTextureOpaque = 1u << 14u;
     constexpr u32 kTriangleFlagTexcoordBounds = 1u << 15u;
     constexpr u32 kTriangleFlagIntegralTexcoordPlane = 1u << 16u;
+    constexpr u32 kTriangleFlagBoundedDepthEqual = 1u << 17u;
     constexpr u32 kVariantFlagTextured = 1u << 0u;
     constexpr u32 kVariantFlagDecal = 1u << 1u;
     constexpr u32 kVariantFlagModulate = 1u << 2u;
@@ -13717,9 +14097,33 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
         bool integralGradients;
     };
 
+    const auto polygonTexcoordBoundsFor = [&](const AcceleratedSceneDraw& draw)
+        -> std::optional<std::array<s16, 4>> {
+        if (draw.PrimitiveType != AcceleratedPrimitiveType::Triangles
+            || draw.VertexCount < 3u || draw.FirstVertex >= SharedGraphicsScene.Vertices.size()
+            || draw.VertexCount > SharedGraphicsScene.Vertices.size() - draw.FirstVertex)
+        {
+            return std::nullopt;
+        }
+
+        std::array<s16, 4> bounds{
+            std::numeric_limits<s16>::max(), std::numeric_limits<s16>::max(),
+            std::numeric_limits<s16>::min(), std::numeric_limits<s16>::min(),
+        };
+        for (u32 i = 0u; i < draw.VertexCount; i++)
+        {
+            const auto& vertex = SharedGraphicsScene.Vertices[draw.FirstVertex + i];
+            bounds[0] = std::min(bounds[0], vertex.TexCoordS);
+            bounds[1] = std::min(bounds[1], vertex.TexCoordT);
+            bounds[2] = std::max(bounds[2], vertex.TexCoordS);
+            bounds[3] = std::max(bounds[3], vertex.TexCoordT);
+        }
+        return bounds;
+    };
+
     const auto linearTexcoordPlaneFor = [&](const AcceleratedSceneDraw& draw) -> std::optional<LinearTexcoordPlane> {
         const Polygon* polygon = draw.SourcePolygon;
-        if (draw.CoverageFixState.Apply || polygon == nullptr
+        if (polygon == nullptr
             || polygon->NumVertices < 3u || polygon->NumVertices > std::size(polygon->Vertices)
             || draw.VertexCount < 3u || draw.FirstVertex >= SharedGraphicsScene.Vertices.size()
             || draw.VertexCount > SharedGraphicsScene.Vertices.size() - draw.FirstVertex
@@ -13798,10 +14202,14 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
 
             const bool integralGradients = sx % determinant == 0 && sy % determinant == 0
                 && tx % determinant == 0 && ty % determinant == 0;
-            if (subpixelOffset[0] != 0 || subpixelOffset[1] != 0)
+            const bool hasSubpixelOffset = subpixelOffset[0] != 0 || subpixelOffset[1] != 0;
+            const bool requiresRectangle = draw.CoverageFixState.Apply || hasSubpixelOffset;
+            const bool separableTexcoords = (sx == 0 || sy == 0) && (tx == 0 || ty == 0);
+            if (hasSubpixelOffset && !integralGradients)
+                return std::nullopt;
+            bool boundedRectangle = false;
+            if (polygon->NumVertices == 4u && (integralGradients || separableTexcoords))
             {
-                if (!integralGradients || polygon->NumVertices != 4u)
-                    return std::nullopt;
                 s32 left = 256, top = 192, right = 0, bottom = 0;
                 for (u32 j = 0u; j < polygon->NumVertices; j++)
                 {
@@ -13819,16 +14227,25 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
                     const bool atBottom = vertex.FinalPosition[1] == bottom;
                     if ((!atRight && vertex.FinalPosition[0] != left)
                         || (!atBottom && vertex.FinalPosition[1] != top))
-                        return std::nullopt;
+                        break;
                     corners |= 1u << (static_cast<u32>(atRight) | (static_cast<u32>(atBottom) << 1u));
                 }
-                if (corners != 0xFu)
-                    return std::nullopt;
-                bounds[0] += std::max<s64>(0, -sx / determinant) + std::max<s64>(0, -sy / determinant);
-                bounds[1] += std::max<s64>(0, -tx / determinant) + std::max<s64>(0, -ty / determinant);
-                bounds[2] -= std::max<s64>(0, sx / determinant) + std::max<s64>(0, sy / determinant);
-                bounds[3] -= std::max<s64>(0, tx / determinant) + std::max<s64>(0, ty / determinant);
+                if (corners == 0xFu)
+                {
+                    const auto positiveCeiling = [&](s64 numerator) -> s64 {
+                        if (numerator == 0 || (numerator < 0) != (determinant < 0))
+                            return 0;
+                        return numerator / determinant + (numerator % determinant != 0);
+                    };
+                    bounds[0] += std::max<s64>(0, -sx / determinant) + std::max<s64>(0, -sy / determinant);
+                    bounds[1] += std::max<s64>(0, -tx / determinant) + std::max<s64>(0, -ty / determinant);
+                    bounds[2] -= positiveCeiling(sx) + positiveCeiling(sy);
+                    bounds[3] -= positiveCeiling(tx) + positiveCeiling(ty);
+                    boundedRectangle = true;
+                }
             }
+            if (requiresRectangle && !boundedRectangle)
+                return std::nullopt;
             const double divisor = static_cast<double>(determinant) * scale;
             return LinearTexcoordPlane{
                 {(origin.FinalPosition[0] + 0.5) * scale, (origin.FinalPosition[1] + 0.5) * scale},
@@ -14150,7 +14567,27 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
         if (perPolygonTiming) graphicsTextureLookupCpuNs += PerfNowNs() - graphicsTextureLookupStartNs;
 
         const u64 graphicsVertexEmitStartNs = perPolygonTiming ? PerfNowNs() : 0u;
-        u32 sceneVertexFlags = 0u;
+        u32 boundedEqualDepth = 0xFFFFFFFFu;
+        const u32 boundedRequiredFlags = AcceleratedPolygonFlagTranslucent | AcceleratedPolygonFlagDepthEqual;
+        const u32 boundedDisallowedFlags = AcceleratedPolygonFlagWBuffer | AcceleratedPolygonFlagNeedOpaquePass
+            | AcceleratedPolygonFlagShadow | AcceleratedPolygonFlagShadowMask;
+        if (VulkanContext::Get().SupportsDepthBounds()
+            && (polygonMeta.Flags & boundedRequiredFlags) == boundedRequiredFlags
+            && (polygonMeta.Flags & boundedDisallowedFlags) == 0u
+            && !sceneDraw.CoverageFixState.Apply
+            && sceneDraw.VertexCount >= 3u
+            && static_cast<size_t>(sceneDraw.FirstVertex) + sceneDraw.VertexCount <= SharedGraphicsScene.Vertices.size())
+        {
+            const auto first = SharedGraphicsScene.Vertices.begin() + sceneDraw.FirstVertex;
+            const u32 depth = first->Z;
+            if (depth <= 0xFFFFFFu
+                && std::all_of(first, first + sceneDraw.VertexCount,
+                    [depth](const AcceleratedSceneVertex& vertex) { return vertex.Z == depth; }))
+            {
+                boundedEqualDepth = depth;
+            }
+        }
+        u32 sceneVertexFlags = boundedEqualDepth != 0xFFFFFFFFu ? kTriangleFlagBoundedDepthEqual : 0u;
         if (hasTexture)
         {
             sceneVertexFlags |= kTriangleFlagTextured;
@@ -14190,12 +14627,13 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
         const std::optional<LinearTexcoordPlane> texcoordPlane = hasTexture
             ? linearTexcoordPlaneFor(sceneDraw)
             : std::nullopt;
-        const u32 texcoordFlags = texcoordPlane
+        const auto boundedTexcoords = texcoordPlane ? std::make_optional(texcoordPlane->bounds)
+            : hasTexture ? polygonTexcoordBoundsFor(sceneDraw) : std::nullopt;
+        const u32 texcoordFlags = boundedTexcoords
             ? kTriangleFlagTexcoordBounds
-                | (texcoordPlane->integralGradients ? kTriangleFlagIntegralTexcoordPlane : 0u)
+                | (texcoordPlane && texcoordPlane->integralGradients ? kTriangleFlagIntegralTexcoordPlane : 0u)
             : 0u;
-        const std::array<s16, 4> texcoordBounds = texcoordPlane
-            ? texcoordPlane->bounds : std::array<s16, 4>{};
+        const std::array<s16, 4> texcoordBounds = boundedTexcoords.value_or(std::array<s16, 4>{});
         const auto texcoordFor = [&](float x, float y, float u, float v) -> std::array<float, 2> {
             if (!texcoordPlane)
                 return {u, v};
@@ -14350,6 +14788,8 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
                 triangle.flags |= kTriangleFlagTopLeftEdge2;
             }
 
+            if (boundedEqualDepth != 0xFFFFFFFFu)
+                triangle.flags |= kTriangleFlagBoundedDepthEqual;
             triangle.polyAttr = polygonMeta.PolyAttr;
             triangle.variantKey = 0u;
             if (hasTexture)
@@ -14486,6 +14926,7 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
             draw.edgeIndexCount = suppressEdgeMarkIndices ? 0u : sceneDraw.EdgeIndexCount;
             draw.edgeColorOverrideMask = edgeColorOverrideMask;
             draw.edgeColorOverridePacked = edgeColorOverridePacked;
+            draw.boundedEqualDepth = boundedEqualDepth;
 
             const u32 drawIndex = static_cast<u32>(GraphicsPolygons.size());
             GraphicsPolygons.push_back(draw);
@@ -15157,7 +15598,7 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu)
     GraphicsStatsCpuWindow.Add(PerfNowNs() - graphicsStatsStartNs);
 }
 
-void VulkanRenderer3D::buildTriangleList(GPU& gpu)
+void VulkanRenderer3D::buildTriangleList(GPU& gpu, bool usePreparedGeometry)
 {
     Triangles.clear();
     GraphicsVertices.clear();
@@ -15180,7 +15621,7 @@ void VulkanRenderer3D::buildTriangleList(GPU& gpu)
     GraphicsShadowMaskDrawIndices.reserve(static_cast<size_t>(gpu.GPU3D.RenderNumPolygons));
     GraphicsShadowDrawIndices.reserve(static_cast<size_t>(gpu.GPU3D.RenderNumPolygons));
 
-    buildGraphicsTriangleList(gpu);
+    buildGraphicsTriangleList(gpu, usePreparedGeometry);
 }
 
 bool VulkanRenderer3D::copyReadyCaptureLineToLineCache()

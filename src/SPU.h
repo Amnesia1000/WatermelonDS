@@ -168,6 +168,23 @@ public:
         }
     }
 
+    s32 DoRunCaptureStep(u32 cycles)
+    {
+        const u32 type = (Cnt >> 29) & 0x3;
+        const u32 nextTimer = Timer + cycles;
+        if (InterpType == AudioInterpolation::None && (Cnt & 0x80000000) &&
+            !KeyOn && !(nextTimer >> 16) &&
+            (type < 3 ? Length + LoopPos >= 16 : Num >= 8))
+        {
+            Timer = nextTimer;
+            s32 val = static_cast<s32>(CurSample);
+            val <<= VolumeShift;
+            val *= Volume;
+            return val;
+        }
+        return DoRun(cycles);
+    }
+
     void PanOutput(s32 in, s32& left, s32& right);
 
 private:

@@ -1598,6 +1598,7 @@ bool GPU::GetFaithfulVramCaptureTagForBBGAddress(
 
 GPU::~GPU() noexcept
 {
+    GPU3D.GetCurrentRenderer().FinishFramePreparation();
 
     ClearFaithfulCaptureTags();
 
@@ -1607,6 +1608,7 @@ GPU::~GPU() noexcept
 
 void GPU::ResetVRAMCache() noexcept
 {
+    GPU3D.GetCurrentRenderer().FinishFramePreparation();
     VRAMCacheEpoch++;
     InvalidateFaithfulCaptureLineage();
     for (int i = 0; i < 9; i++)
@@ -1640,6 +1642,7 @@ void GPU::ResetVRAMCache() noexcept
 
 void GPU::Reset() noexcept
 {
+    GPU3D.GetCurrentRenderer().FinishFramePreparation();
     VCount = 0;
     NextVCount = -1;
     TotalScanlines = 0;
@@ -1742,6 +1745,7 @@ void GPU::Stop() noexcept
 
 void GPU::DoSavestate(Savestate* file) noexcept
 {
+    GPU3D.GetCurrentRenderer().FinishFramePreparation();
     file->Section("GPUG");
 
     file->Var16(&VCount);

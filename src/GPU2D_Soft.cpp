@@ -17,6 +17,7 @@
 */
 
 #include "GPU2D_Soft.h"
+#include "SpritePriorityOrder.h"
 #include "GPU.h"
 #include "GPU3D.h"
 #include "NDS.h"
@@ -1168,7 +1169,7 @@ void SoftRenderer::PublishFaithfulCaptureProduct() noexcept
         auto record = std::make_shared<FaithfulCaptureProductRecord>();
         record->Metadata = FaithfulCaptureProduct;
         record->RecipeEncoding = recipeEncoding;
-        record->Material = FaithfulCaptureProductMaterial;
+        record->Material = FaithfulCaptureProductMaterial.Current();
         record->CausalLines = FaithfulCaptureProductCausalLines;
         if (record->RecipeEncoding
             == FaithfulCaptureRecipeEncoding::SourceAOnly)
@@ -2866,7 +2867,7 @@ SoftRenderer::ResolveFaithfulObjCaptureTag(
 const u32* SoftRenderer::GetFaithfulLineRegs(unsigned engine) const noexcept
 {
     if (engine > 1) return nullptr;
-    return FaithfulLineRegsStorage.data()
+    return FaithfulLineRegsStorage.Current().data()
         + (size_t)engine * kStructuredScreenHeight * kFaithfulRegsPerLine;
 }
 
@@ -2892,12 +2893,12 @@ const u16* SoftRenderer::GetFaithfulCapEscrita(u32 par) const noexcept
 
 const u16* SoftRenderer::GetFaithfulModo2Linea() const noexcept
 {
-    return FaithfulModo2Linea.data();
+    return FaithfulModo2Linea.Current().data();
 }
 
 const u16* SoftRenderer::GetFaithfulPrevModo2Linea() const noexcept
 {
-    return FaithfulPrevModo2Linea.data();
+    return FaithfulModo2Linea.Published().data();
 }
 
 u32 SoftRenderer::GetFaithfulCapEscritaSeq(u32 par) const noexcept
@@ -2908,7 +2909,7 @@ u32 SoftRenderer::GetFaithfulCapEscritaSeq(u32 par) const noexcept
 const u32* SoftRenderer::GetFaithfulPrevLineRegs(unsigned engine) const noexcept
 {
     if (engine > 1) return nullptr;
-    return FaithfulPrevLineRegsStorage.data()
+    return FaithfulLineRegsStorage.Published().data()
         + (size_t)engine * kStructuredScreenHeight * kFaithfulRegsPerLine;
 }
 
@@ -2929,17 +2930,17 @@ const u8* SoftRenderer::GetFaithfulPrevOAMLatch() const noexcept
 
 const u32* SoftRenderer::GetFaithfulPrevLineaCompuesta() const noexcept
 {
-    return FaithfulPrevLineaCompuesta.data();
+    return FaithfulLineaCompuesta.Published().data();
 }
 
 const u32* SoftRenderer::GetFaithfulLineaCompuesta() const noexcept
 {
-    return FaithfulLineaCompuesta.data();
+    return FaithfulLineaCompuesta.Current().data();
 }
 
 const u32* SoftRenderer::GetFaithfulPrevLine3DOperands() const noexcept
 {
-    return FaithfulPrevLine3DOperands.data();
+    return FaithfulLine3DOperands.Published().data();
 }
 
 const SoftRenderer::FaithfulCaptureProductMetadata&
@@ -2972,7 +2973,7 @@ const u32* SoftRenderer::GetFaithfulCaptureProductPixelMask(
     unsigned engine) const noexcept
 {
     if (engine >= 2u) return nullptr;
-    return FaithfulCaptureProductPixelMask.data()
+    return FaithfulCaptureProductPixelMask.Current().data()
         + engine * kStructuredPixelCount;
 }
 
@@ -2980,7 +2981,7 @@ const u32* SoftRenderer::GetFaithfulPrevCaptureProductPixelMask(
     unsigned engine) const noexcept
 {
     if (engine >= 2u) return nullptr;
-    return FaithfulPrevCaptureProductPixelMask.data()
+    return FaithfulCaptureProductPixelMask.Published().data()
         + engine * kStructuredPixelCount;
 }
 
@@ -2995,7 +2996,7 @@ const u16* SoftRenderer::GetFaithfulCaptureProductMaterial(
     {
         return nullptr;
     }
-    return FaithfulCaptureProductMaterial.data();
+    return FaithfulCaptureProductMaterial.Current().data();
 }
 
 const u16* SoftRenderer::GetFaithfulPrevCaptureProductMaterial(
@@ -3009,7 +3010,7 @@ const u16* SoftRenderer::GetFaithfulPrevCaptureProductMaterial(
     {
         return nullptr;
     }
-    return FaithfulPrevCaptureProductMaterial.data();
+    return FaithfulCaptureProductMaterial.Published().data();
 }
 
 const SoftRenderer::FaithfulCaptureProductLineCausalMetadata*
@@ -3602,7 +3603,7 @@ void SoftRenderer::PublishFaithfulPhysicalSnapshot() noexcept
 
 void SoftRenderer::PublishFaithfulRegisterSnapshot() noexcept
 {
-    FaithfulPrevLineRegsStorage = FaithfulLineRegsStorage;
+    FaithfulLineRegsStorage.Publish();
     FaithfulPrevFrameMeta = FaithfulFrameMeta;
     {
         static const bool sondaL = std::getenv("MELON_SONDA_LATCH") != nullptr;
@@ -3619,15 +3620,15 @@ void SoftRenderer::PublishFaithfulRegisterSnapshot() noexcept
 
     FaithfulPrevSwapScanout = FaithfulSwapScanout;
     if (FaithfulComponerActivo[0] || FaithfulComponerActivo[1])
-        FaithfulPrevLineaCompuesta = FaithfulLineaCompuesta;
+        FaithfulLineaCompuesta.Publish();
     if (FaithfulComponerActivo[0])
-        FaithfulPrevLine3DOperands = FaithfulLine3DOperands;
+        FaithfulLine3DOperands.Publish();
 
-    FaithfulPrevModo2Linea = FaithfulModo2Linea;
+    FaithfulModo2Linea.Publish();
     FaithfulPrevCaptureProduct = FaithfulCaptureProduct;
     FaithfulPrevCaptureLineProducts = FaithfulCaptureLineProducts;
-    FaithfulPrevCaptureProductPixelMask = FaithfulCaptureProductPixelMask;
-    FaithfulPrevCaptureProductMaterial = FaithfulCaptureProductMaterial;
+    FaithfulCaptureProductPixelMask.Publish();
+    FaithfulCaptureProductMaterial.Publish();
     FaithfulPrevCaptureProductCausalLines =
         FaithfulCaptureProductCausalLines;
 
@@ -3883,10 +3884,8 @@ void SoftRenderer::CaptureFaithfulLineRegs(u32 line, int n3dline,
             FaithfulCaptureProductDependenciesExact = false;
             FaithfulCaptureLineProducts.fill({});
             FaithfulPrevCaptureLineProducts.fill({});
-            FaithfulCaptureProductPixelMask.fill(0u);
-            FaithfulPrevCaptureProductPixelMask.fill(0u);
-            FaithfulCaptureProductMaterial.fill(0u);
-            FaithfulPrevCaptureProductMaterial.fill(0u);
+            FaithfulCaptureProductPixelMask.Reset();
+            FaithfulCaptureProductMaterial.Reset();
             FaithfulCaptureProductCausalLines.fill({});
             FaithfulPrevCaptureProductCausalLines.fill({});
             FaithfulCaptureProductRecipeSlot = 0u;
@@ -3980,8 +3979,8 @@ void SoftRenderer::CaptureFaithfulLineRegs(u32 line, int n3dline,
         std::memcpy(FaithfulPaletteLatch.data(), GPU.Palette, 0x800);
         std::memcpy(FaithfulOAMLatch.data(), GPU.OAM, 0x800);
     }
-    u32* w = FaithfulLineRegsStorage.data()
-           + ((size_t)engine * kStructuredScreenHeight + line) * kFaithfulRegsPerLine;
+    u32* w = FaithfulLineRegsStorage.OverwriteRow(
+        engine * kStructuredScreenHeight + line);
     EmpaquetarRegsFiel(*CurUnit, line, n3dline, forceblank, w);
     ClearFaithfulCaptureLineProduct(engine, line);
 
@@ -4219,12 +4218,10 @@ void SoftRenderer::ClearFaithfulCaptureLineProduct(
     const size_t lineIndex = engine * kStructuredScreenHeight + line;
     FaithfulCaptureLineProducts[lineIndex] = {};
     std::fill_n(
-        FaithfulCaptureProductPixelMask.data()
-            + engine * kStructuredPixelCount + line * kStructuredScreenWidth,
+        FaithfulCaptureProductPixelMask.OverwriteRow(lineIndex),
         kStructuredScreenWidth,
         0u);
-    u32* words = FaithfulLineRegsStorage.data()
-        + lineIndex * kFaithfulRegsPerLine;
+    u32* words = FaithfulLineRegsStorage.WriteRow(lineIndex);
     words[27] = words[28] = words[29] = words[30] = words[31] = 0u;
 }
 
@@ -4273,8 +4270,7 @@ void SoftRenderer::ExportFaithfulCaptureLineProduct(
     FaithfulCaptureLineProducts[lineIndex] = metadata;
     if (metadata.ValidExact)
     {
-        u32* mask = FaithfulCaptureProductPixelMask.data()
-            + engine * kStructuredPixelCount + line * kStructuredScreenWidth;
+        u32* mask = FaithfulCaptureProductPixelMask.WriteRow(lineIndex);
         for (u32 x = 0u; x < kStructuredScreenWidth; x++)
         {
             const FaithfulComposedCaptureTag& tag = tags[x];
@@ -4283,8 +4279,7 @@ void SoftRenderer::ExportFaithfulCaptureLineProduct(
         }
     }
 
-    u32* words = FaithfulLineRegsStorage.data()
-        + lineIndex * kFaithfulRegsPerLine;
+    u32* words = FaithfulLineRegsStorage.WriteRow(lineIndex);
     words[27] = static_cast<u32>(metadata.ProductId);
     words[28] = static_cast<u32>(metadata.ProductId >> 32u);
     words[29] = static_cast<u32>(metadata.SourceXBase);
@@ -4321,14 +4316,11 @@ void SoftRenderer::ExportFaithfulUniformCaptureLineProduct(
     const size_t lineIndex = engine * kStructuredScreenHeight + line;
     FaithfulCaptureLineProducts[lineIndex] = metadata;
     std::fill_n(
-        FaithfulCaptureProductPixelMask.data()
-            + engine * kStructuredPixelCount
-            + line * kStructuredScreenWidth,
+        FaithfulCaptureProductPixelMask.OverwriteRow(lineIndex),
         kStructuredScreenWidth,
         1u << 26u);
 
-    u32* words = FaithfulLineRegsStorage.data()
-        + lineIndex * kFaithfulRegsPerLine;
+    u32* words = FaithfulLineRegsStorage.WriteRow(lineIndex);
     words[27] = static_cast<u32>(metadata.ProductId);
     words[28] = static_cast<u32>(metadata.ProductId >> 32u);
     words[29] = static_cast<u32>(metadata.SourceXBase);
@@ -4371,7 +4363,7 @@ void SoftRenderer::BeginFaithfulCaptureProduct(
     FaithfulCaptureProductRecipeLinesSeen.fill(0u);
     FaithfulCaptureProductRecipeLineCount = 0u;
     FaithfulCaptureProductRecipeTupleCoherent = FaithfulCaptureProduct.Valid;
-    FaithfulCaptureProductMaterial.fill(0u);
+    FaithfulCaptureProductMaterial.Fill(0u);
     FaithfulCaptureProductCausalLines.fill({});
 }
 
@@ -4452,7 +4444,7 @@ void SoftRenderer::PrepareFaithfulCaptureProductLine(
         FaithfulCaptureProductRecipeLinesSeen.fill(0u);
         FaithfulCaptureProductRecipeLineCount = 0u;
         FaithfulCaptureProductRecipeTupleCoherent = false;
-        FaithfulCaptureProductMaterial.fill(0u);
+        FaithfulCaptureProductMaterial.Fill(0u);
         FaithfulCaptureProductCausalLines.fill({});
     }
     if (line == 0u)
@@ -4632,7 +4624,7 @@ void SoftRenderer::StampFaithfulCaptureLine(
         FaithfulCaptureProductRecipeLinesSeen.fill(0u);
         FaithfulCaptureProductRecipeLineCount = 0u;
         FaithfulCaptureProductRecipeTupleCoherent = false;
-        FaithfulCaptureProductMaterial.fill(0u);
+        FaithfulCaptureProductMaterial.Fill(0u);
         FaithfulCaptureProductCausalLines.fill({});
     }
 
@@ -4665,8 +4657,7 @@ void SoftRenderer::StampFaithfulCaptureLine(
         FaithfulCaptureProductLineCount++;
         const u16* const physicalBank =
             reinterpret_cast<const u16*>(GPU.VRAM[destinationBank]);
-        u16* const materialLine = FaithfulCaptureProductMaterial.data()
-            + line * kStructuredScreenWidth;
+        u16* const materialLine = FaithfulCaptureProductMaterial.WriteRow(line);
         for (u32 x = 0u; x < width; x++)
         {
             materialLine[x] =
@@ -7447,8 +7438,8 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
         if (con3dPre)
         {
 
-            u32* dst = FaithfulLineaCompuesta.data() + line * 256u;
-            u32* operands = FaithfulLine3DOperands.data() + line * 256u;
+            u32* dst = FaithfulLineaCompuesta.OverwriteRow(line);
+            u32* operands = FaithfulLine3DOperands.OverwriteRow(line);
             for (u32 i = 0; i < 256u; i++)
             {
                 const u32 val = BGOBJLine[i];
@@ -7470,7 +7461,7 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
                     operands[i] = 0u;
                 }
             }
-            FaithfulLineRegsStorage[line * kFaithfulRegsPerLine + 18u]
+            FaithfulLineRegsStorage.WriteRow(line)[18u]
                 |= (1u << 12u);
         }
         else
@@ -7478,8 +7469,8 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
             const size_t engPre = CurUnit->Num ? 1u : 0u;
             {
 
-                u32* dstL = FaithfulLineaCompuesta.data()
-                          + (engPre * kStructuredScreenHeight + line) * 256u;
+                u32* dstL = FaithfulLineaCompuesta.OverwriteRow(
+                    engPre * kStructuredScreenHeight + line);
                 for (u32 i = 0; i < 256u; i++)
                     dstL[i] = BGOBJLine[i] & 0x00FFFFFFu;
             }
@@ -7502,10 +7493,8 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
                 const size_t lineIndex = kStructuredScreenHeight + line;
                 const FaithfulCaptureLineProductMetadata& productLine =
                     FaithfulCaptureLineProducts[lineIndex];
-                const u32* mask = FaithfulCaptureProductPixelMask.data()
-                    + kStructuredPixelCount + line * kStructuredScreenWidth;
-                u32* dst = FaithfulLineaCompuesta.data()
-                    + lineIndex * kStructuredScreenWidth;
+                const u32* mask = FaithfulCaptureProductPixelMask.CurrentRow(lineIndex);
+                u32* dst = FaithfulLineaCompuesta.WriteRow(lineIndex);
                 for (u32 x = 0u; x < kStructuredScreenWidth; x++)
                     dst[x] |= mask[x];
                 if (productLine.ValidExact && productLine.TaggedPixelCount != 0u)
@@ -7516,12 +7505,12 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
             }
             else
             {
-                std::fill_n(FaithfulLine3DOperands.data() + line * 256u,
+                std::fill_n(FaithfulLine3DOperands.OverwriteRow(line),
                             256u, 0u);
                 ClearFaithfulCaptureLineProduct(0u, line);
             }
-            FaithfulLineRegsStorage[(engPre * kStructuredScreenHeight + line)
-                                    * kFaithfulRegsPerLine + 18u] |= marcaPre;
+            FaithfulLineRegsStorage.WriteRow(
+                engPre * kStructuredScreenHeight + line)[18u] |= marcaPre;
         }
     }
     CurUnit->UpdateMosaicCounters(line);
@@ -7609,7 +7598,7 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
 
                 if (UseFaithfulVulkan2D() && CurUnit->Num == 0u && line < 192u)
                 {
-                    std::memcpy(&FaithfulModo2Linea[line * 256u], vram,
+                    std::memcpy(FaithfulModo2Linea.OverwriteRow(line), vram,
                                 256u * sizeof(u16));
                     mode2HasUniformSpan =
                         GPU.ResolveFaithfulVramCaptureUniformSpan(
@@ -7769,7 +7758,7 @@ void SoftRenderer::DrawScanlineActivePipeline(u32 line, Unit* unit)
 
                 if (UseFaithfulVulkan2D() && CurUnit->Num == 0u && line < 192u)
                 {
-                    std::memset(&FaithfulModo2Linea[line * 256u], 0,
+                    std::memset(FaithfulModo2Linea.OverwriteRow(line), 0,
                                 256u * sizeof(u16));
                     ClearFaithfulCaptureLineProduct(0u, line);
                 }
@@ -11724,33 +11713,19 @@ void SoftRenderer::DrawSpritesActivePipeline(u32 line, Unit* unit)
 
     u16* oam = (u16*)&GPU.OAM[CurUnit->Num ? 0x400 : 0];
 
-    const s32 spritewidth[16] =
-    {
-        8, 16, 8, 8,
-        16, 32, 8, 8,
-        32, 32, 16, 8,
-        64, 64, 32, 8
-    };
-    const s32 spriteheight[16] =
-    {
-        8, 8, 16, 8,
-        16, 8, 32, 8,
-        32, 16, 32, 8,
-        64, 32, 64, 8
-    };
-
+    const SpritePriorityOrder spriteOrder(oam, line);
     for (int bgnum = 0x0C00; bgnum >= 0x0000; bgnum -= 0x0400)
     {
         if (renderer2dDebugControlsActive
             && !MelonDSAndroid::isRenderer2DDebugObjectPriorityEnabled(CurUnit->Num, static_cast<u32>(bgnum) >> 10u))
             continue;
 
-        for (int sprnum = 127; sprnum >= 0; sprnum--)
+        for (u32 sprnum = spriteOrder.First(static_cast<u32>(bgnum) >> 10u);
+             sprnum != SpritePriorityOrder::End;
+             sprnum = spriteOrder.Next(static_cast<u32>(bgnum) >> 10u, sprnum))
         {
             u16* attrib = &oam[sprnum*4];
 
-            if ((attrib[2] & 0x0C00) != bgnum)
-                continue;
             if (renderer2dDebugControlsActive
                 && !Renderer2DDebugShouldDrawObject(CurUnit->Num, static_cast<u32>(sprnum), attrib))
                 continue;
@@ -11769,8 +11744,8 @@ void SoftRenderer::DrawSpritesActivePipeline(u32 line, Unit* unit)
             if (attrib[0] & 0x0100)
             {
                 u32 sizeparam = (attrib[0] >> 14) | ((attrib[1] & 0xC000) >> 12);
-                s32 width = spritewidth[sizeparam];
-                s32 height = spriteheight[sizeparam];
+                s32 width = SpritePriorityOrder::Widths[sizeparam];
+                s32 height = SpritePriorityOrder::Heights[sizeparam];
                 s32 boundwidth = width;
                 s32 boundheight = height;
 
@@ -11802,8 +11777,8 @@ void SoftRenderer::DrawSpritesActivePipeline(u32 line, Unit* unit)
                     continue;
 
                 u32 sizeparam = (attrib[0] >> 14) | ((attrib[1] & 0xC000) >> 12);
-                s32 width = spritewidth[sizeparam];
-                s32 height = spriteheight[sizeparam];
+                s32 width = SpritePriorityOrder::Widths[sizeparam];
+                s32 height = SpritePriorityOrder::Heights[sizeparam];
 
                 u32 ypos = attrib[0] & 0xFF;
                 if (((line - ypos) & 0xFF) >= (u32)height)

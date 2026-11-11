@@ -42,6 +42,7 @@ PFN_vkCmdFillBuffer vkCmdFillBuffer = nullptr;
 PFN_vkCmdPipelineBarrier vkCmdPipelineBarrier = nullptr;
 PFN_vkCmdPushConstants vkCmdPushConstants = nullptr;
 PFN_vkCmdSetBlendConstants vkCmdSetBlendConstants = nullptr;
+PFN_vkCmdSetDepthBounds vkCmdSetDepthBounds = nullptr;
 PFN_vkCmdSetScissor vkCmdSetScissor = nullptr;
 PFN_vkCmdSetStencilCompareMask vkCmdSetStencilCompareMask = nullptr;
 PFN_vkCmdSetStencilReference vkCmdSetStencilReference = nullptr;
@@ -223,6 +224,7 @@ void loadGlobalSymbols()
     loadGlobal(vkCmdSetBlendConstants, "vkCmdSetBlendConstants");
     loadGlobal(vkCmdSetScissor, "vkCmdSetScissor");
     loadGlobal(vkCmdSetStencilCompareMask, "vkCmdSetStencilCompareMask");
+    loadGlobal(vkCmdSetDepthBounds, "vkCmdSetDepthBounds");
     loadGlobal(vkCmdSetStencilReference, "vkCmdSetStencilReference");
     loadGlobal(vkCmdSetStencilWriteMask, "vkCmdSetStencilWriteMask");
     loadGlobal(vkCmdSetViewport, "vkCmdSetViewport");
@@ -359,6 +361,7 @@ void loadInstanceSymbols(VkInstance instance)
     loadInstance(instance, vkCmdSetBlendConstants, "vkCmdSetBlendConstants");
     loadInstance(instance, vkCmdSetScissor, "vkCmdSetScissor");
     loadInstance(instance, vkCmdSetStencilCompareMask, "vkCmdSetStencilCompareMask");
+    loadInstance(instance, vkCmdSetDepthBounds, "vkCmdSetDepthBounds");
     loadInstance(instance, vkCmdSetStencilReference, "vkCmdSetStencilReference");
     loadInstance(instance, vkCmdSetStencilWriteMask, "vkCmdSetStencilWriteMask");
     loadInstance(instance, vkCmdSetViewport, "vkCmdSetViewport");
@@ -604,6 +607,11 @@ void loadDeviceSymbols(VkDevice device)
         auto resolved = reinterpret_cast<PFN_vkCmdSetStencilCompareMask>(vkGetDeviceProcAddr(device, "vkCmdSetStencilCompareMask"));
         if (resolved != nullptr)
             vkCmdSetStencilCompareMask = resolved;
+    }
+    {
+        auto resolved = reinterpret_cast<PFN_vkCmdSetDepthBounds>(vkGetDeviceProcAddr(device, "vkCmdSetDepthBounds"));
+        if (resolved != nullptr)
+            vkCmdSetDepthBounds = resolved;
     }
     if (vkGetDeviceProcAddr != nullptr) {
         auto resolved = reinterpret_cast<PFN_vkCmdSetStencilReference>(vkGetDeviceProcAddr(device, "vkCmdSetStencilReference"));

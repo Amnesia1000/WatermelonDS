@@ -27,6 +27,7 @@
 #include "GPU2D.h"
 #include "GPU3D.h"
 #include "FaithfulVramCaptureTagResolver.h"
+#include "FaithfulFrameBuffer.h"
 
 namespace melonDS
 {
@@ -1007,14 +1008,14 @@ private:
     static constexpr size_t kStructuredLineMaskBytes =
         kStructuredScreenCount * kStructuredScreenHeight;
 
-    std::array<u32, kFaithfulRegWords> FaithfulLineRegsStorage {};
+    FaithfulFrameBuffer<u32, 2 * kStructuredScreenHeight,
+        kFaithfulRegsPerLine> FaithfulLineRegsStorage {};
     std::array<u32, 16> FaithfulFrameMeta {};
     u32 FaithfulFrameSeq = 0;
 
     std::array<u8, 0x800> FaithfulPaletteLatch {};
     std::array<u8, 0x800> FaithfulOAMLatch {};
 
-    std::array<u32, kFaithfulRegWords> FaithfulPrevLineRegsStorage {};
     std::array<u32, 16> FaithfulPrevFrameMeta {};
     std::array<u8, 0x800> FaithfulPrevPaletteLatch {};
     std::array<u8, 0x800> FaithfulPrevOAMLatch {};
@@ -1068,18 +1069,14 @@ private:
     void CollectUnreferencedFaithfulCaptureProducts() noexcept;
     void PublishFaithfulCaptureProduct() noexcept;
 
-    std::array<u32, 2 * 192 * 256> FaithfulLineaCompuesta {};
-    std::array<u32, 2 * 192 * 256> FaithfulPrevLineaCompuesta {};
-    std::array<u32, 192 * 256> FaithfulLine3DOperands {};
-    std::array<u32, 192 * 256> FaithfulPrevLine3DOperands {};
+    FaithfulFrameBuffer<u32, 2 * 192, 256> FaithfulLineaCompuesta {};
+    FaithfulFrameBuffer<u32, 192, 256> FaithfulLine3DOperands {};
     std::array<FaithfulCaptureLineProductMetadata, 2 * 192>
         FaithfulCaptureLineProducts {};
     std::array<FaithfulCaptureLineProductMetadata, 2 * 192>
         FaithfulPrevCaptureLineProducts {};
-    std::array<u32, 2 * 192 * 256> FaithfulCaptureProductPixelMask {};
-    std::array<u32, 2 * 192 * 256> FaithfulPrevCaptureProductPixelMask {};
-    std::array<u16, 192 * 256> FaithfulCaptureProductMaterial {};
-    std::array<u16, 192 * 256> FaithfulPrevCaptureProductMaterial {};
+    FaithfulFrameBuffer<u32, 2 * 192, 256> FaithfulCaptureProductPixelMask {};
+    FaithfulFrameBuffer<u16, 192, 256> FaithfulCaptureProductMaterial {};
     std::array<FaithfulCaptureProductLineCausalMetadata, 192>
         FaithfulCaptureProductCausalLines {};
     std::array<FaithfulCaptureProductLineCausalMetadata, 192>
@@ -1182,8 +1179,7 @@ private:
     std::array<u16, 2 * 192 * 256> FaithfulCapEscrita {};
     std::array<u32, 2> FaithfulCapEscritaSeq {};
 
-    std::array<u16, 192 * 256> FaithfulModo2Linea {};
-    std::array<u16, 192 * 256> FaithfulPrevModo2Linea {};
+    FaithfulFrameBuffer<u16, 192, 256> FaithfulModo2Linea {};
 
     u32 FaithfulSwapScanout = 0;
     u32 FaithfulPrevSwapScanout = 0;

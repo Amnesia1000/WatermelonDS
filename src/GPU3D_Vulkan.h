@@ -30,6 +30,7 @@
 #include "GPU3D_AcceleratedFrontend.h"
 #include "GPU3D_TexcacheVulkan.h"
 #include "VulkanPerfStats.h"
+#include "ThreadLifecycleScope.h"
 
 namespace melonDS
 {
@@ -49,15 +50,24 @@ public:
         SubmittedRenderIdentity Identity{};
     };
 
-    static std::unique_ptr<VulkanRenderer3D> New() noexcept;
+    static std::unique_ptr<VulkanRenderer3D> New(
+        ThreadLifecycleScope::Callback workerLifecycle = nullptr,
+        ThreadLifecycleScope::Callback workerCreationLifecycle = nullptr) noexcept;
 
-    VulkanRenderer3D() noexcept;
+    explicit VulkanRenderer3D(
+        ThreadLifecycleScope::Callback workerLifecycle = nullptr,
+        ThreadLifecycleScope::Callback workerCreationLifecycle = nullptr) noexcept;
     ~VulkanRenderer3D() override;
 
     void Reset(GPU& gpu) override;
     void VCount144(GPU& gpu) override;
     void RenderFrame(GPU& gpu) override;
+    void PrepareFrameGeometry(const GPU3D& gpu) noexcept override;
+    void SetFramePreparationDeferred(bool enabled) noexcept override;
+    void FinishFramePreparation() const noexcept override;
     bool SetFrameSubmissionDeferred(bool enabled, VkSemaphore dependency = VK_NULL_HANDLE, u64 value = 0);
+    using SubmissionDependency = bool (*)(void*);
+    bool SetSubmissionDependency(SubmissionDependency callback, void* context = nullptr);
     bool HasDeferredFrameSubmission() const { return DeferredRenderContext != nullptr; }
     void RestartFrame(GPU& gpu) override;
     u32* GetLine(int line) override;
@@ -420,6 +430,7 @@ private:
         u32 edgeIndexCount = 0;
         u32 edgeColorOverrideMask = 0;
         u32 edgeColorOverridePacked = 0;
+        u32 boundedEqualDepth = 0xFFFFFFFFu;
     };
 
     bool ensureInitialized();
@@ -530,8 +541,9 @@ private:
     void logPerformanceIfNeeded();
 
     void WarmTextureCache(GPU& gpu);
-    void buildGraphicsTriangleList(GPU& gpu);
-    void buildTriangleList(GPU& gpu);
+    AcceleratedSceneBuildConfig sceneBuildConfigForScale(int scale) const;
+    void buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeometry);
+    void buildTriangleList(GPU& gpu, bool usePreparedGeometry = false);
 
     bool selectGraphicsDepthStencilFormat();
     bool dispatchRasterAndReadback(
@@ -566,7 +578,7 @@ private:
         bool nativeProjectionOnly = false);
     bool dispatchPlainRearPlaneOnly(RenderContext* context, u32 rgbaColor);
     bool submitGraphicsCaptureExportForCurrentFrame();
-    bool submitFaithfulNativeProjection(GPU& gpu);
+    bool submitFaithfulNativeProjection(GPU& gpu, bool usePreparedGeometry = false);
     bool submitFaithfulNativeProjectionForCurrentFrame();
     [[nodiscard]] bool captureIdentityMatchesCurrentFrameKey(
         const CaptureSourceIdentity& identity) const noexcept;
@@ -583,6 +595,16 @@ private:
 
 private:
     TexcacheVulkan Texcache;
+    const ThreadLifecycleScope::Callback WorkerLifecycle;
+    const ThreadLifecycleScope::Callback WorkerCreationLifecycle;
+    struct FramePreparation;
+    std::unique_ptr<FramePreparation> Preparation;
+    bool FramePreparationDeferred = false;
+    bool FramePreparationUnavailable = false;
+    bool ensureFramePreparation() noexcept;
+    void renderPreparedFrame(GPU& gpu, bool textureCacheChanged,
+        bool prefetchNativeForCompose, u32 captureCnt, u32 displayCnt, u64 renderStartNs,
+        bool usePreparedGeometry = false);
 
     int ScaleFactor = 1;
 
@@ -620,6 +642,11 @@ private:
     VkPhysicalDevice PhysicalDevice = VK_NULL_HANDLE;
     bool flushDeferredRenderSubmission(VkSemaphore dependency = VK_NULL_HANDLE, u64 value = 0);
     bool FrameSubmissionDeferred = false;
+    SubmissionDependency BeforeSubmission = nullptr;
+    void* BeforeSubmissionContext = nullptr;
+    bool SubmissionDependencyFailed = false;
+    bool flushSubmissionDependency();
+    VkResult submitQueue(const VkSubmitInfo& submit, VkFence fence);
     RenderContext* DeferredRenderContext = nullptr;
     VkResult DeferredRenderSubmitResult = VK_SUCCESS;
 
@@ -704,8 +731,10 @@ private:
     std::array<VkPipeline, GraphicsOpaquePipelineCount> GraphicsOpaqueFastModulateOpaqueAlphaPlainOcclusionNoAttrPipelines{};
     std::array<VkPipeline, GraphicsOpaquePipelineCount> GraphicsOpaqueFastModulateOpaqueAlphaPlainNoDepthOcclusionNoAttrPipelines{};
     std::array<VkPipeline, GraphicsTranslucentPipelineCount> GraphicsTranslucentPipelines{};
+    std::array<VkPipeline, GraphicsTranslucentPipelineCount> GraphicsBoundedDepthTranslucentPipelines{};
     std::array<VkPipeline, GraphicsTranslucentPipelineCount> GraphicsTranslucentFastModulatePlainFragmentDepthPipelines{};
     std::array<VkPipeline, GraphicsBgZeroTranslucentPipelineCount> GraphicsBgZeroTranslucentPipelines{};
+    std::array<VkPipeline, GraphicsBgZeroTranslucentPipelineCount> GraphicsBoundedDepthBgZeroTranslucentPipelines{};
     std::array<VkPipeline, GraphicsBgZeroTranslucentPipelineCount> GraphicsBgZeroFastModulatePlainPipelines{};
     std::array<VkPipeline, GraphicsShadowMaskPipelineCount> GraphicsShadowMaskPipelines{};
     std::array<VkPipeline, GraphicsShadowMaskBgZeroPipelineCount> GraphicsShadowMaskBgZeroPipelines{};

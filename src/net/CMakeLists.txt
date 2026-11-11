@@ -18,9 +18,10 @@ set(NET_UTILS_SOURCES
 )
 
 if (MELONDS_ENABLE_ENET)
-    list(APPEND NET_UTILS_SOURCES
-        LAN.cpp
-        Netplay.cpp)
+    list(APPEND NET_UTILS_SOURCES LAN.cpp)
+    if (NOT ANDROID)
+        list(APPEND NET_UTILS_SOURCES Netplay.cpp)
+    endif()
 endif()
 
 add_library(net-utils STATIC ${NET_UTILS_SOURCES})

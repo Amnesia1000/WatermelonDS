@@ -371,6 +371,9 @@ public:
     virtual void VCount144(GPU& gpu) {};
     virtual void Stop(const GPU& gpu) {}
     virtual void RenderFrame(GPU& gpu) = 0;
+    virtual void PrepareFrameGeometry(const GPU3D& gpu) noexcept {}
+    virtual void SetFramePreparationDeferred(bool enabled) noexcept {}
+    virtual void FinishFramePreparation() const noexcept {}
 
     [[nodiscard]] virtual bool FrameskipPlaceholderServido() const noexcept { return false; }
     virtual void RestartFrame(GPU& gpu) {};

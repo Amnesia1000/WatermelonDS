@@ -1214,9 +1214,37 @@ void SPU::Mix(u32 spucycles)
         }
         else
         {
+            bool reusableCapture = true;
+            for (const auto& capture : Capture)
+            {
+                if (!(capture.Cnt & (1<<7))) continue;
+                const u64 extent = std::max(static_cast<u64>(capture.Length) + 3,
+                    static_cast<u64>(capture.FIFOWriteOffset) + 4);
+                if (capture.DstAddr < 0x02000000 ||
+                    static_cast<u64>(capture.DstAddr) + extent > 0x03000000)
+                    reusableCapture = false;
+            }
+            auto canReuseSample = [](const SPUChannel& channel) {
+                const u32 type = (channel.Cnt >> 29) & 0x3;
+                return channel.InterpType == AudioInterpolation::None &&
+                    (channel.Cnt & 0x80000000) && !channel.KeyOn &&
+                    (type < 3 ? channel.Length + channel.LoopPos >= 16 : channel.Num >= 8);
+            };
+            u32 reusableSamples = 0;
+            u32 runnableSamples = 0;
             std::array<s32, 16> channelSamples;
             for (u32 i = 0; i < channelSamples.size(); i++)
-                channelSamples[i] = Channels[i].DoRun(0);
+            {
+                const auto& channel = Channels[i];
+                const u32 type = (channel.Cnt >> 29) & 0x3;
+                if ((channel.Cnt & 0x80000000) &&
+                    (type < 3 ? channel.Length + channel.LoopPos >= 16 : channel.Num >= 8))
+                    runnableSamples |= 1u << i;
+                channelSamples[i] = Channels[i].DoRunCaptureStep(0);
+                if (reusableCapture && canReuseSample(Channels[i]))
+                    reusableSamples |= 1u << i;
+            }
+            const bool reuseChannels = reusableCapture && reusableSamples == runnableSamples;
 
             auto mixChannels = [&](bool mixAdd01, bool mixAdd23,
                                    s32& mixLeft, s32& mixRight) {
@@ -1265,27 +1293,53 @@ void SPU::Mix(u32 spucycles)
                 if (Capture[0].Cnt & (1<<7)) includeTimer(Capture[0].Timer);
                 if (Capture[1].Cnt & (1<<7)) includeTimer(Capture[1].Timer);
 
-                const bool edgeAdd01 = (Capture[0].Cnt & 0x81) == 0x81;
-                const bool edgeAdd23 = (Capture[1].Cnt & 0x81) == 0x81;
-                s32 edgeLeft, edgeRight;
-                mixChannels(edgeAdd01, edgeAdd23, edgeLeft, edgeRight);
+                s32 capture0Value = 0, capture1Value = 0;
+                if (((Capture[0].Cnt & (1<<7)) && ((Capture[0].Timer + step) >> 16)) ||
+                    ((Capture[1].Cnt & (1<<7)) && ((Capture[1].Timer + step) >> 16)))
+                {
+                    const bool edgeAdd01 = (Capture[0].Cnt & 0x81) == 0x81;
+                    const bool edgeAdd23 = (Capture[1].Cnt & 0x81) == 0x81;
+                    s32 edgeLeft, edgeRight;
+                    mixChannels(edgeAdd01, edgeAdd23, edgeLeft, edgeRight);
 
-                const s32 capture0Value = (Capture[0].Cnt & (1<<1))
-                    ? CaptureDirectToPCM16(
-                        channelSamples[0], channelSamples[1], edgeAdd01)
-                    : CaptureMixerToPCM16(edgeLeft);
-                const s32 capture1Value = (Capture[1].Cnt & (1<<1))
-                    ? CaptureDirectToPCM16(
-                        channelSamples[2], channelSamples[3], edgeAdd23)
-                    : CaptureMixerToPCM16(edgeRight);
+                    capture0Value = (Capture[0].Cnt & (1<<1))
+                        ? CaptureDirectToPCM16(
+                            channelSamples[0], channelSamples[1], edgeAdd01)
+                        : CaptureMixerToPCM16(edgeLeft);
+                    capture1Value = (Capture[1].Cnt & (1<<1))
+                        ? CaptureDirectToPCM16(
+                            channelSamples[2], channelSamples[3], edgeAdd23)
+                        : CaptureMixerToPCM16(edgeRight);
+                }
 
                 if (Capture[0].Cnt & (1<<7))
                     Capture[0].Run(step, capture0Value);
                 if (Capture[1].Cnt & (1<<7))
                     Capture[1].Run(step, capture1Value);
 
-                for (u32 i = 0; i < channelSamples.size(); i++)
-                    channelSamples[i] = Channels[i].DoRun(step);
+                if (reuseChannels)
+                {
+                    for (u32 i = 0; i < channelSamples.size(); i++)
+                    {
+                        if (!(runnableSamples & (1u << i))) continue;
+                        auto& channel = Channels[i];
+                        const u32 nextTimer = channel.Timer + step;
+                        if ((reusableSamples & (1u << i)) && !(nextTimer >> 16))
+                            channel.Timer = nextTimer;
+                        else
+                        {
+                            const bool wasActive = (channel.Cnt & 0x80000000) != 0;
+                            channelSamples[i] = channel.DoRunCaptureStep(step);
+                            if (!wasActive) runnableSamples &= ~(1u << i);
+                            if (!(channel.Cnt & 0x80000000)) reusableSamples &= ~(1u << i);
+                        }
+                    }
+                }
+                else
+                {
+                    for (u32 i = 0; i < channelSamples.size(); i++)
+                        channelSamples[i] = Channels[i].DoRunCaptureStep(step);
+                }
                 cyclesLeft -= step;
             }
 
@@ -8101,7 +8155,7 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
 
             AdaptPhaseObjetivoFrames =
                 AdaptPhaseOrigenRecuperacionRate
-                ? AdaptPhaseRebaseMinFrames : nivelPostConsumo;
+                ? AdaptPhaseRebaseMinFrames : std::min(nivelPostConsumo, objetivo);
             AdaptPhaseObjetivoActivo = true;
             AdaptPhaseRebasePendiente = false;
             AdaptPhaseRebaseBandViolada = false;

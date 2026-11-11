@@ -558,6 +558,7 @@ bool VulkanContext::initializeLocked()
         queueCreateInfo.pQueuePriorities = queuePriorities;
 
         VkPhysicalDeviceFeatures enabledCoreFeatures{};
+        enabledCoreFeatures.depthBounds = deviceFeatures2.features.depthBounds;
         enabledCoreFeatures.independentBlend =
             deviceFeatures2.features.independentBlend;
         enabledCoreFeatures.shaderSampledImageArrayDynamicIndexing =
@@ -598,6 +599,8 @@ bool VulkanContext::initializeLocked()
         TimelineSemaphoresSupported = enableTimelineSemaphores;
         DisplayTimingSupported = enableDisplayTiming;
         DynamicTextureIndexingSupported = enableDynamicTextureIndexing;
+        DepthBoundsSupported = enabledCoreFeatures.depthBounds == VK_TRUE
+            && vkCmdSetDepthBounds != nullptr;
         DeviceProfile = candidateProfile;
         Platform::Log(
             Platform::LogLevel::Warn,
@@ -707,6 +710,7 @@ void VulkanContext::shutdownLocked()
     TimelineSemaphoresSupported = false;
     DisplayTimingSupported = false;
     DynamicTextureIndexingSupported = false;
+    DepthBoundsSupported = false;
     ForceDisableTimelineSemaphores = false;
     ForceDisableDynamicTextureIndexing = false;
     DeviceProfile = VulkanDeviceProfile{};

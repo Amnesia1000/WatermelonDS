@@ -93,8 +93,7 @@ vec2 clampPolygonTexcoord(vec2 texcoord)
     if ((fTriInfo0.x & TRI_FLAG_TEXCOORD_BOUNDS) != 0u)
     {
         vec2 bounded = clamp(texcoord, fTexcoordBounds.xy, fTexcoordBounds.zw);
-        if ((fTriInfo0.x & TRI_FLAG_INTEGRAL_TEXCOORD_PLANE) != 0u
-            && any(notEqual(texcoord, bounded)))
+        if ((fTriInfo0.x & TRI_FLAG_INTEGRAL_TEXCOORD_PLANE) != 0u)
         {
             float grid = float(pc.width) * (1.0 / 8.0);
             bounded = round(bounded * grid) / grid;

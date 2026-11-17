@@ -39,7 +39,8 @@ const uint TRI_FLAG_DECAL = 1u << 2u;
 const uint TRI_FLAG_LINEAR = 1u << 6u;
 const uint TRI_FLAG_TEXTURE_OPAQUE = 1u << 14u;
 const uint TRI_FLAG_TEXCOORD_BOUNDS = 1u << 15u;
-const uint TRI_FLAG_INTEGRAL_TEXCOORD_PLANE = 1u << 16u;
+const uint TRI_FLAG_INTEGRAL_TEXCOORD_S = 1u << 16u;
+const uint TRI_FLAG_INTEGRAL_TEXCOORD_T = 1u << 18u;
 
 int wrapTexelCoord(int coord, int size, bool repeat, bool mirror)
 {
@@ -131,11 +132,14 @@ uint sampleTextureAlpha()
     if ((flags & TRI_FLAG_TEXCOORD_BOUNDS) != 0u)
     {
         vec2 bounded = clamp(texcoord, fTexcoordBounds.xy, fTexcoordBounds.zw);
-        if ((flags & TRI_FLAG_INTEGRAL_TEXCOORD_PLANE) != 0u
+        uint integralAxes = flags & (TRI_FLAG_INTEGRAL_TEXCOORD_S | TRI_FLAG_INTEGRAL_TEXCOORD_T);
+        if (integralAxes != 0u
             && any(notEqual(texcoord, bounded)))
         {
             float grid = float(pc.width) * (1.0 / 8.0);
-            bounded = round(bounded * grid) / grid;
+            vec2 snapped = round(bounded * grid) / grid;
+            bounded = mix(bounded, snapped, bvec2((integralAxes & TRI_FLAG_INTEGRAL_TEXCOORD_S) != 0u,
+                                                  (integralAxes & TRI_FLAG_INTEGRAL_TEXCOORD_T) != 0u));
         }
         texcoord = bounded;
     }

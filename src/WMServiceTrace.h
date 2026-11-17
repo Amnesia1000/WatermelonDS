@@ -486,6 +486,7 @@ struct WMServiceTrace
     std::unique_ptr<u8[]> Snapshot;
     FileHeader File{};
     SnapshotHeader SnapshotMeta{};
+    u32 SnapshotAPI = ~u32{0};
     std::string LastRequest;
     std::string Path;
     u64 Epoch = 0;

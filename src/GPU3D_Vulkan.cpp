@@ -11093,11 +11093,6 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
         const u32 yBounds = Triangles[draw.firstTriangle].yBounds;
         return {yBounds & 0xFFFFu, (yBounds >> 16u) & 0xFFFFu};
     };
-    const auto yBoundsOverlap = [&](const GraphicsPolygonDraw& a, const GraphicsPolygonDraw& b) -> bool {
-        const auto [aTop, aBottom] = drawYBounds(a);
-        const auto [bTop, bBottom] = drawYBounds(b);
-        return aBottom > bTop && bBottom > aTop;
-    };
     const auto drawTopDs = [&](const GraphicsPolygonDraw& draw) -> float {
         const auto [top, bottom] = drawYBounds(draw);
         (void)bottom;
@@ -11118,11 +11113,6 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
             maxX = std::max(maxX, std::max(tri.x0, std::max(tri.x1, tri.x2)));
         }
         return {minX, maxX};
-    };
-    const auto xBoundsOverlap = [&](const GraphicsPolygonDraw& a, const GraphicsPolygonDraw& b) -> bool {
-        const auto [aLeft, aRight] = drawXBounds(a);
-        const auto [bLeft, bRight] = drawXBounds(b);
-        return aRight > bLeft && bRight > aLeft;
     };
     const auto isClampPaletteUiTriangle = [&](const TriangleGpu& tri) -> bool {
         const u32 texParam = tri.texParam;
@@ -11260,6 +11250,27 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
         }
         return false;
     }();
+    struct ReplayBounds
+    {
+        float left, right, nearest, farthest;
+        u32 top, bottom;
+    };
+    const auto replayBounds = [&](const GraphicsPolygonDraw& draw) {
+        const auto first = Triangles.begin() + draw.firstTriangle;
+        const auto end = first + draw.triangleCount;
+        ReplayBounds bounds{first->x0, first->x0, first->z0, first->z0,
+                            first->yBounds & 0xFFFFu, first->yBounds >> 16u};
+        for (auto tri = first; tri != end; ++tri)
+        {
+            bounds.left = std::min({bounds.left, tri->x0, tri->x1, tri->x2});
+            bounds.right = std::max({bounds.right, tri->x0, tri->x1, tri->x2});
+            bounds.nearest = std::min({bounds.nearest, tri->z0, tri->z1, tri->z2});
+            bounds.farthest = std::max({bounds.farthest, tri->z0, tri->z1, tri->z2});
+            bounds.top = std::min(bounds.top, tri->yBounds & 0xFFFFu);
+            bounds.bottom = std::max(bounds.bottom, tri->yBounds >> 16u);
+        }
+        return bounds;
+    };
     const auto shouldReplayOpaquePaletteUiDraw = [&](const GraphicsPolygonDraw& draw) -> bool {
         if (!clearPlaneAlphaZero
             || !alphaBlendEnabled
@@ -11292,6 +11303,7 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
             return false;
         }
 
+        const auto opaque = replayBounds(draw);
         bool matchesPaletteUiOverlay = false;
         for (u32 alphaDrawIndex : GraphicsAlphaDrawIndices)
         {
@@ -11299,27 +11311,26 @@ bool VulkanRenderer3D::dispatchGraphicsRasterAndReadback(
                 continue;
 
             const GraphicsPolygonDraw& alphaDraw = GraphicsPolygons[alphaDrawIndex];
+            const auto overlay = replayBounds(alphaDraw);
+            if (overlay.bottom <= opaque.top || opaque.bottom <= overlay.top)
+                continue;
+
+            const bool overlapsX = overlay.right > opaque.left && opaque.right > overlay.left;
+            if (overlapsX && overlay.nearest < opaque.farthest)
+                return false;
+
             if (compactStatusGlyph)
             {
-                if (isCompactTopStatusGlyphOverlay(alphaDraw)
-                    && yBoundsOverlap(draw, alphaDraw))
-                {
-                    return true;
-                }
+                if (isCompactTopStatusGlyphOverlay(alphaDraw))
+                    matchesPaletteUiOverlay = true;
                 continue;
             }
 
-            if (!isTranslucentPaletteUiOverlay(alphaDraw)
-                || !yBoundsOverlap(draw, alphaDraw))
-            {
+            if (!isTranslucentPaletteUiOverlay(alphaDraw))
                 continue;
-            }
 
-            if (isPaletteUiHelpPanelOverlay(alphaDraw)
-                && xBoundsOverlap(draw, alphaDraw))
-            {
+            if (overlapsX && isPaletteUiHelpPanelOverlay(alphaDraw))
                 return false;
-            }
             const u32 alpha5 = (alphaDraw.polyAttr >> 16u) & 0x1Fu;
             if (!hasLowAlphaPaletteUiOverlay && alpha5 >= 27u && drawTopDs(draw) >= 18.0f)
             {
@@ -14025,8 +14036,9 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeome
     constexpr u32 kTriangleFlagTopLeftEdge2 = 1u << 13u;
     constexpr u32 kTriangleFlagTextureOpaque = 1u << 14u;
     constexpr u32 kTriangleFlagTexcoordBounds = 1u << 15u;
-    constexpr u32 kTriangleFlagIntegralTexcoordPlane = 1u << 16u;
+    constexpr u32 kTriangleFlagIntegralTexcoordS = 1u << 16u;
     constexpr u32 kTriangleFlagBoundedDepthEqual = 1u << 17u;
+    constexpr u32 kTriangleFlagIntegralTexcoordT = 1u << 18u;
     constexpr u32 kVariantFlagTextured = 1u << 0u;
     constexpr u32 kVariantFlagDecal = 1u << 1u;
     constexpr u32 kVariantFlagModulate = 1u << 2u;
@@ -14094,7 +14106,7 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeome
         std::array<double, 2> dx;
         std::array<double, 2> dy;
         std::array<s16, 4> bounds;
-        bool integralGradients;
+        u32 integralTexcoordFlags;
     };
 
     const auto polygonTexcoordBoundsFor = [&](const AcceleratedSceneDraw& draw)
@@ -14200,8 +14212,9 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeome
                 }
             }
 
-            const bool integralGradients = sx % determinant == 0 && sy % determinant == 0
-                && tx % determinant == 0 && ty % determinant == 0;
+            const bool integralS = sx % determinant == 0 && sy % determinant == 0;
+            const bool integralT = tx % determinant == 0 && ty % determinant == 0;
+            const bool integralGradients = integralS && integralT;
             const bool hasSubpixelOffset = subpixelOffset[0] != 0 || subpixelOffset[1] != 0;
             const bool requiresRectangle = draw.CoverageFixState.Apply || hasSubpixelOffset;
             const bool separableTexcoords = (sx == 0 || sy == 0) && (tx == 0 || ty == 0);
@@ -14253,7 +14266,7 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeome
                 {static_cast<double>(sx) / divisor, static_cast<double>(tx) / divisor},
                 {static_cast<double>(sy) / divisor, static_cast<double>(ty) / divisor},
                 bounds,
-                integralGradients,
+                (integralS ? kTriangleFlagIntegralTexcoordS : 0u) | (integralT ? kTriangleFlagIntegralTexcoordT : 0u),
             };
         }
         return std::nullopt;
@@ -14631,7 +14644,7 @@ void VulkanRenderer3D::buildGraphicsTriangleList(GPU& gpu, bool usePreparedGeome
             : hasTexture ? polygonTexcoordBoundsFor(sceneDraw) : std::nullopt;
         const u32 texcoordFlags = boundedTexcoords
             ? kTriangleFlagTexcoordBounds
-                | (texcoordPlane && texcoordPlane->integralGradients ? kTriangleFlagIntegralTexcoordPlane : 0u)
+                | (texcoordPlane ? texcoordPlane->integralTexcoordFlags : 0u)
             : 0u;
         const std::array<s16, 4> texcoordBounds = boundedTexcoords.value_or(std::array<s16, 4>{});
         const auto texcoordFor = [&](float x, float y, float u, float v) -> std::array<float, 2> {

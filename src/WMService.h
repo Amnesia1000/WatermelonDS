@@ -23,6 +23,7 @@ public:
     bool DeferFrameWait(u64 delay);
     void FinishFrameWait();
     void SetFrameDeadline(u64 deadline);
+    static u64 ThreadWaitTimeUS();
     void Capture(u32 word);
     void ClearFIFO();
     bool BlocksARM7() const;

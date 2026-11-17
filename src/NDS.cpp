@@ -621,6 +621,8 @@ void NDS::Stop(Platform::StopReason reason)
 
     Log(level, "Stopping emulated console (Reason: %s)\n", StopReasonName(reason));
     Running = false;
+    if (reason == Platform::StopReason::WirelessUnsupported && IsWMTraceActive() && !(WMTrace->File.Flags & 2))
+        SnapshotWMTrace();
     FlushWMTrace(3);
     WM->Reset();
     Platform::SignalStop(reason, UserData);
@@ -972,6 +974,11 @@ void NDS::TraceWMFrameBoundary(const std::string& directory)
                 Log(LogLevel::Error, "WMTRACE begin failed id=%s console=%d\n", requested, ConsoleType);
                 return;
             }
+            char apiText[PROP_VALUE_MAX]{};
+            __system_property_get("debug.melonds.wm_snapshot_api", apiText);
+            unsigned api = 0;
+            char extra;
+            WMTrace->SnapshotAPI = sscanf(apiText, "%u%c", &api, &extra) == 1 && api < 0x80 ? api : ~u32{0};
             Log(LogLevel::Info, "WMTRACE begin id=%s epoch=%" PRIu64 " frame=%u capacity=%u path=%s\n",
                 requested, WMTrace->File.Epoch, NumFrames, WMServiceTrace::Capacity, WMTrace->Path.c_str());
         }
@@ -1155,6 +1162,9 @@ u64 NDS::TraceWMEvent(u32 kind, u32 word, const WMServiceTraceMetadata* metadata
     const auto read16 = [&](u32 offset) {
         return static_cast<u32>(event.Buffer[offset]) | (static_cast<u32>(event.Buffer[offset + 1]) << 8);
     };
+    if (kind == WMServiceTrace::ARM9Send && (event.Flags & WMServiceTrace::Accepted)
+        && read16(0) == trace.SnapshotAPI && !(trace.File.Flags & 2))
+        SnapshotWMTrace();
     const auto read32 = [&](u32 offset) { return read16(offset) | (read16(offset + 2) << 16); };
     const u32 api = read16(0);
     if (kind <= WMServiceTrace::ARM7Receive && api == 0xF)

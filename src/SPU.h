@@ -319,7 +319,7 @@ public:
     }
 
     void SetOutputSpeedHint(double speed);
-    void SetOutputLatencyFrames(u32 frames);
+    void SetOutputLatencyFrames(u32 frames, bool lowLatency = false);
     void EnableOutputTimeStretch();
     void ResetOutputAdaptivo();
 
@@ -409,6 +409,7 @@ private:
     double AdaptRatio = 1.0;
     double AdaptHint = 0.0;
     bool AdaptProbe = false;
+    bool AdaptTempoRecuperandoExceso = false;
 
     bool AdaptFastLowPendiente = false;
 

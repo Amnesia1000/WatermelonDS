@@ -36,12 +36,26 @@ u64 Now()
         std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
+thread_local u64 ThreadWaitUS = 0;
+
+u64 SleepForWM(u64 delay)
+{
+    const u64 start = Now();
+    Platform::Sleep(delay);
+    const u64 end = Now();
+    ThreadWaitUS += end - start;
+    return end;
+}
+
 constexpr u32 Magic = 0x31534D57;
 constexpr u32 CallbackFlag = 0x027FFF96;
 constexpr size_t MaxCallbacks = 1024;
 constexpr size_t MaxOperations = 32;
 constexpr u64 ARM7ClockHz = 33513982;
 constexpr u64 TicksPerMillisecond = 33514;
+constexpr u64 ScanSetupTicks = 111744;
+constexpr u64 ScanWakeTicks = ARM7ClockHz * 2048 / 1000000;
+constexpr u64 ScanReturnTicks = 7936;
 constexpr u16 LegacyChildMPLine = 240;
 constexpr u64 HeartbeatInterval = 25000;
 std::atomic<u64> EpochCounter{0};
@@ -56,6 +70,7 @@ enum class Message : u8
 
 constexpr u16 BSSSize = 192;
 constexpr u16 TimedBSSSize = 230;
+constexpr u16 LocalDisconnectReason = 0xF001;
 constexpr u32 VTSFAddress = 0x0380FFF0;
 constexpr size_t MaxPendingBeacons = 256;
 
@@ -108,8 +123,11 @@ struct RadioClock
 struct WMABI
 {
     bool Modern = true;
-    bool Firmware = false;
-    bool SplitPower = false;
+    bool Early = false;
+    bool SplitPower = true;
+    bool ReturnsRequestAfterHandler = false;
+    bool ShortGameInfoResult = true;
+    bool SupportsSetEntry = true;
     u16 WM7Base = 0x200;
     u16 StatusBase = 0x500;
     u16 ReplyBase = 0xE00;
@@ -123,6 +141,7 @@ struct WMABI
     u16 LocalMAC = 0xE0;
     u16 OperatingMode = 0xE6;
     u16 ParentParameters = 0xE8;
+    u8 ParentParamShift = 0;
     u16 ChildMACs = 0x128;
     u16 Members = 0x182;
     u16 ScanBuffer = 0x184;
@@ -141,14 +160,20 @@ struct WMABI
     u16 Indications = 0;
     u16 ConnectedTGID = 0;
     u16 LastSeen = 0;
-    constexpr bool LegacyRetail() const { return !Modern && !Firmware; }
+    u32 InitSetupTicks = 0;
+    u16 MPStartupTicks = 0;
+    constexpr bool LegacyRetail() const { return !Modern && !Early; }
 };
 
 constexpr WMABI RetailABI{};
 constexpr WMABI FirmwareABI = [] {
     WMABI abi;
     abi.Modern = false;
-    abi.Firmware = true;
+    abi.ShortGameInfoResult = false;
+    abi.Early = true;
+    abi.SupportsSetEntry = false;
+    abi.ParentParamShift = 2;
+    abi.SplitPower = false;
     abi.WM7Base = 0x600;
     abi.StatusBase = 0x700;
     abi.ReplyBase = 0x1200;
@@ -159,11 +184,14 @@ constexpr WMABI FirmwareABI = [] {
     abi.Ready = 0x8A;
     abi.EffectiveTX = 0x192;
     abi.EffectiveRX = 0x194;
+    abi.Lifetime = 0;
     return abi;
 }();
 constexpr WMABI LegacyRetailABI = [] {
     WMABI abi;
     abi.Modern = false;
+    abi.ShortGameInfoResult = false;
+    abi.SplitPower = false;
     abi.RXSelector = 0x44;
     abi.RXSize = 0x46;
     abi.RX = 0x48;
@@ -193,9 +221,14 @@ constexpr WMABI LegacyRetailABI = [] {
     return abi;
 }();
 
-constexpr WMABI ExpandedLegacyRetailABI = [] {
+constexpr WMABI SplitPowerLegacyRetailABI = [] {
     WMABI abi = LegacyRetailABI;
     abi.SplitPower = true;
+    return abi;
+}();
+
+constexpr WMABI ExpandedLegacyRetailABI = [] {
+    WMABI abi = SplitPowerLegacyRetailABI;
     abi.WM7Base = 0xA00;
     abi.StatusBase = 0xD00;
     abi.ReplyBase = 0x1600;
@@ -204,10 +237,46 @@ constexpr WMABI ExpandedLegacyRetailABI = [] {
     return abi;
 }();
 
+constexpr WMABI EarlyRetailABI = [] {
+    WMABI abi = LegacyRetailABI;
+    abi.Early = true;
+    abi.SupportsSetEntry = false;
+    abi.ParentParamShift = 2;
+    abi.SplitPower = true;
+    abi.WM7Base = FirmwareABI.WM7Base;
+    abi.StatusBase = FirmwareABI.StatusBase;
+    abi.ReplyBase = FirmwareABI.ReplyBase;
+    abi.MP = 0x10;
+    abi.RXSelector = 0x42;
+    abi.Frequency = 0x3C;
+    abi.Lifetime = 0;
+    abi.LastSeen = 0;
+    abi.MPStartupTicks = 15579;
+    return abi;
+}();
+
+constexpr WMABI ExpandedEarlyRetailABI = [] {
+    WMABI abi = EarlyRetailABI;
+    abi.ReturnsRequestAfterHandler = true;
+    abi.ShortGameInfoResult = true;
+    abi.SupportsSetEntry = true;
+    abi.ParentParamShift = 0;
+    abi.WM7Base = 0xA00;
+    abi.StatusBase = 0xD00;
+    abi.ReplyBase = 0x1800;
+    abi.RXSelector = 0x44;
+    abi.Lifetime = 0x9B0;
+    abi.LastSeen = 0x930;
+    abi.InitSetupTicks = TicksPerMillisecond * 13 / 2;
+    abi.MPStartupTicks = 32866;
+    return abi;
+}();
+
 const WMABI& ABIFor(u8 profile)
 {
-    return profile == 2 ? FirmwareABI : profile == 3 ? LegacyRetailABI
-        : profile == 4 ? ExpandedLegacyRetailABI : RetailABI;
+    if (profile == 5) return EarlyRetailABI;
+    if (profile == 3) return LegacyRetailABI;
+    return profile == 2 ? FirmwareABI : profile == 4 ? ExpandedLegacyRetailABI : RetailABI;
 }
 
 u16 MPChannels(u16 allowed)
@@ -251,6 +320,7 @@ struct Callback
     Bytes Receive;
     u32 ReceiveBase = 0;
     bool End = false;
+    bool ReturnsRequest = false;
     u64 RoundID = 0;
     u64 RoundEpoch = 0;
     u64 RoundOwner = 0;
@@ -420,7 +490,6 @@ struct WMService::Impl
     bool MP = false;
     std::optional<bool> BeaconIndication;
     bool ScanPending = false;
-    bool ScanExConfigured = false;
     bool ConnectPending = false;
     bool Terminal = false;
     bool StopRequested = false;
@@ -444,6 +513,7 @@ struct WMService::Impl
     u16 LifeTime = 0xFFFF;
     u16 FrameLifeTime = 5;
     u8 Profile = 0;
+    const WMABI* LocalABI = &RetailABI;
     u32 WM9 = 0;
     u32 WM7 = 0;
     u32 Status = 0;
@@ -458,6 +528,21 @@ struct WMService::Impl
     u64 NextOffer = 0;
     u64 NextBeacon = 0;
     u16 PresenceRecipients = 0;
+    struct
+    {
+        u32 Address = 0;
+        u16 API = 0;
+        u16 MeasureChannel = 0;
+        u64 Deadline = 0;
+        u64 Class1At = 0;
+    } RadioTransition;
+    struct
+    {
+        u32 Address = 0;
+        u16 API = 0;
+        bool AwaitingResult = false;
+    } ActiveRequest;
+    u64 ScanListenStart = 0;
     u64 ScanDeadline = 0;
     u64 ScanToken = 0;
     u64 NextScanToken = 1;
@@ -490,6 +575,7 @@ struct WMService::Impl
     u64 NextRound = 1;
     u64 MPGeneration = 0;
     u64 NextMPGeneration = 1;
+    u64 MPStartDeadline = 0;
     u64 NextPreparation = 1;
     u64 LastParentRound = 0;
     u16 LastVCount = 0;
@@ -559,14 +645,14 @@ struct WMService::Impl
     }
     void State(u16 state) { if (Status) Write16(Status, state); }
     u16 State() const { return Status ? Read16(Status) : 0; }
-    const WMABI& Layout() const { return ABIFor(Profile); }
+    const WMABI& Layout() const { return *LocalABI; }
     u32 MPOffset() const { return Layout().MP; }
     u32 RXOffset() const { return Layout().RX; }
     u32 RXSizeOffset() const { return Layout().RXSize; }
     u32 RXSelectorOffset() const { return Layout().RXSelector; }
     void EncodeMAC(u8* output, const MAC& mac) const
     {
-        for (u32 i = 0; i < 6; i++) output[i] = mac[Layout().Firmware ? (i ^ 1) : i];
+        for (u32 i = 0; i < 6; i++) output[i] = mac[Layout().Early ? (i ^ 1) : i];
     }
     MAC ReadMAC(const u8* input) const
     {
@@ -588,12 +674,12 @@ struct WMService::Impl
             if (Peers[id].Connected && Peers[id].MP && Negotiated(id))
                 ready |= Parent ? (1u << Peers[id].AID) : 1;
         ReadyBitmap = ready;
-        if (!Layout().Firmware) Write16(Status + Layout().Ready, ready);
+        if (!Layout().Early) Write16(Status + Layout().Ready, ready);
     }
 
     void LastSeen(u16 aid, u64 timestamp)
     {
-        if (!Layout().LegacyRetail() || aid >= 16) return;
+        if (!Layout().LastSeen || aid >= 16) return;
         Write32(Status + Layout().LastSeen + aid * 8, timestamp);
         Write32(Status + Layout().LastSeen + aid * 8 + 4, timestamp >> 32);
     }
@@ -608,21 +694,48 @@ struct WMService::Impl
         return target >= 0x02000000 && target < 0x03000000 ? static_cast<u32>(target) : 0;
     }
 
-    bool HasLegacyMPProducer(u32 global) const
+    u32 RegisteredEarlyGetter(u32 dispatcher, bool expanded) const
+    {
+        const u32 offset = expanded ? 0x840 : 0x6FC;
+        const u32 registration = dispatcher + offset;
+        if (!Range(dispatcher, offset + 0x34) || Read32(registration) != 0xE59F1028
+            || Read32(registration + 4) != 0xE3A0000A) return 0;
+        const u32 callback = Read32(registration + 0x30);
+        if (!Range(callback, 4) || Memory(callback) != Memory(dispatcher)) return 0;
+        const u32 setter = BranchTarget(registration + 8);
+        if (Read32(setter + 0x08) != 0xE1A04000 || Read32(setter + 0x0C) != 0xE1A05001
+            || Read32(setter + 0x14) != 0xE59F1050 || Read32(setter + 0x1C) != 0xE7815104) return 0;
+        const u32 table = Read32(setter + 0x6C);
+        if (!Range(table, 11 * 4) || (table & 3) || Read32(table + 10 * 4) != callback) return 0;
+        const u32 portSetter = BranchTarget(dispatcher + (expanded ? 0x7D8 : 0x6AC));
+        if (Read32(portSetter + 0x3C) != 0xE0801108
+            || Read32(portSetter + 0x40) != (expanded ? 0xE58170B8 : 0xE58170AC)) return 0;
+        return BranchTarget(portSetter + 0x38);
+    }
+
+    bool HasLegacyMPProducer(u32 global, u32 earlyGetter = 0) const
     {
         unsigned found = 0;
         for (u32 offset = 0; offset + 0x180 <= Console.MainRAMMask + 1; offset += 4)
         {
             const u8* code = Console.MainRAM + offset;
-            if (U32(code) != 0xE92D41F0 || U32(code + 4) != 0xE24DD020
-                || U32(code + 0x58) != 0xE28000C2 || U32(code + 0x74) != 0xE1D10CB2
+            if (U32(code) != 0xE92D41F0 || U32(code + 4) != 0xE24DD020) continue;
+            if (earlyGetter)
+            {
+                if (U32(code + 0x48) != 0xE2800010 || U32(code + 0x54) != 0xE5900010
+                    || U32(code + 0x84) != 0xE215003F || U32(code + 0xB4) != 0xE218001F
+                    || U32(code + 0x110) != 0xE1A030A5 || U32(code + 0x114) != 0xE3A0000E
+                    || U32(code + 0x118) != 0xE3A0100A) continue;
+            }
+            else if (U32(code + 0x58) != 0xE28000C2 || U32(code + 0x74) != 0xE1D10CB2
                 || U32(code + 0xCC) != 0xE216003F || U32(code + 0xFC) != 0xE214001F
                 || U32(code + 0x158) != 0xE1A030A6 || U32(code + 0x15C) != 0xE3A0000E
                 || U32(code + 0x160) != 0xE3A0100A) continue;
             const u32 address = 0x02000000 + offset;
             const u32 getter = BranchTarget(address + 0x18);
-            const u32 receive = BranchTarget(address + 0xB4);
-            const u32 transmit = BranchTarget(address + 0xE4);
+            if (earlyGetter && getter != earlyGetter) continue;
+            const u32 receive = BranchTarget(address + (earlyGetter ? 0x6C : 0xB4));
+            const u32 transmit = BranchTarget(address + (earlyGetter ? 0x9C : 0xE4));
             if (Read32(getter) != 0xE59F0004 || Read32(getter + 4) != 0xE5900000
                 || Read32(getter + 8) != 0xE12FFF1E || Read32(getter + 12) != global
                 || Read32(receive + 0x9C) != 0xE1D059B0 || Read32(transmit + 0x6C) != 0xE1D008BE) continue;
@@ -638,32 +751,72 @@ struct WMService::Impl
         if ((wm7 | status | reply) & 3) return false;
         if (!Range(wm7, 0x100) || !Range(status, 0xA00) || !Range(reply, 0x100)) return false;
         u8 foundProfile = 0;
+        const WMABI* foundABI = nullptr;
         u32 foundOwner = 0;
         unsigned found = 0;
-        for (u32 offset = 0; offset + 0x3C8 <= Console.MainRAMMask + 1; offset += 2)
+        for (u32 offset = 0; (offset & ~3u) + 0x270 <= Console.MainRAMMask + 1; offset += 2)
         {
             const u8* code = Console.MainRAM + offset;
             u8 profile = 0;
+            const WMABI* abi = nullptr;
             u32 owner = 0;
-            if ((offset & 3) == 0 && U32(code) == 0xE92D4FF8 && U32(code + 4) == 0xE24DD008
-                && U32(code + 8) == 0xE59F0388 && U32(code + 0x10) == 0xE5904004
-                && U32(code + 0xA8) == 0xE59100CC && U32(code + 0xB4) == 0xE591010C
-                && U32(code + 0xFC) == 0xE59A101C && U32(code + 0x190) == 0xE5901018)
+            if (U32(code) == 0xB086B5F8 && U32(code + 4) == 0x1C0D4899 && U32(code + 8) == 0x2A006844
+                && U16(code + 0x5C) == 0x2882 && U32(code + 0x68) == 0x680030CC
+                && U32(code + 0x70) == 0x00802043 && U16(code + 0x74) == 0x5809
+                && U32(code + 0x82) == 0x88093172 && U16(code + 0xA2) == 0x69E9
+                && U32(code + 0xCA) == 0x88093172 && U16(code + 0xF8) == 0x6981)
             {
                 profile = 1;
-                const u32 global = U32(code + 0x398);
+                const u32 literal = ((offset + 8) & ~3u) + 0x264;
+                const u32 global = U32(Console.MainRAM + literal);
                 if (Range(global, 8)) owner = Read32(global + 4);
             }
-            else if ((offset & 3) == 0 && offset + 0x3CC <= Console.MainRAMMask + 1
-                && U32(code) == 0xE92D4FF0 && U32(code + 4) == 0xE24DD00C
-                && U32(code + 8) == 0xE59F03B8 && U32(code + 0x10) == 0xE5908000
+            else if ((offset & 3) == 0 && offset + 0x38C <= Console.MainRAMMask + 1
+                && U32(code) == 0xE92D4FF0 && U32(code + 4) == 0xE24DD004
+                && U32(code + 8) == 0xE59F0378 && U32(code + 0x10) == 0xE5909000
                 && U32(code + 0xAC) == 0xE59100CC && U32(code + 0xB8) == 0xE591010C
-                && U32(code + 0xD0) == 0xE1D117B2 && U32(code + 0x150) == 0xE1D117B2
+                && U32(code + 0xD0) == 0xE1D114B6 && U32(code + 0x150) == 0xE1D114B6
                 && U32(code + 0x100) == 0xE59A101C && U32(code + 0x1A4) == 0xE5901018)
             {
+                const u32 global = U32(code + 0x388);
+                if (Range(global, 4) && !(global & 3) && HasLegacyMPProducer(global))
+                {
+                    profile = 3;
+                    abi = &SplitPowerLegacyRetailABI;
+                    owner = Read32(global);
+                }
+            }
+            else if ((offset & 3) == 0 && offset + 0x3B4 <= Console.MainRAMMask + 1
+                && U32(code) == 0xE92D4FF0 && U32(code + 4) == 0xE24DD00C
+                && U32(code + 0x10) == 0xE5908000
+                && (U32(code + 8) == 0xE59F03A0
+                    || (offset + 0x3CC <= Console.MainRAMMask + 1 && U32(code + 8) == 0xE59F03B8)))
+            {
+                const bool compact = U32(code + 8) == 0xE59F03A0;
+                const u8* portLookup = code + (compact ? 0xA8 : 0xAC);
+                if (U32(portLookup) != 0xE59100CC || U32(portLookup + 0xC) != 0xE591010C
+                    || U32(portLookup + 0x24) != 0xE1D117B2 || U32(portLookup + 0xA4) != 0xE1D117B2
+                    || U32(portLookup + 0x54) != 0xE59A101C || U32(code + (compact ? 0x198 : 0x1A4)) != 0xE5901018)
+                    continue;
                 profile = 1;
-                const u32 global = U32(code + 0x3C8);
+                const u32 global = U32(code + 0x10 + (U32(code + 8) & 0xFFF));
                 if (Range(global, 4)) owner = Read32(global);
+            }
+            else if (offset + 0x3C8 > Console.MainRAMMask + 1) continue;
+            else if ((offset & 3) == 0 && U32(code) == 0xE92D4FF8 && U32(code + 4) == 0xE24DD008
+                && U32(code + 0x10) == 0xE5904004
+                && U32(code + 0xA8) == 0xE59100CC && U32(code + 0xB4) == 0xE591010C
+                && ((U32(code + 8) == 0xE59F0388 && U32(code + 0xFC) == 0xE59A101C
+                        && U32(code + 0x190) == 0xE5901018)
+                    || (U32(code + 0xCC) == 0xE1D117B2 && U32(code + 0x140) == 0xE1D117B2
+                        && U32(code + 0xF8) == 0xE59A101C
+                        && ((U32(code + 8) == 0xE59F0388 && U32(code + 0x184) == 0xE5901018)
+                            || (offset + 0x3D8 <= Console.MainRAMMask + 1 && U32(code + 8) == 0xE59F03C4
+                                && U32(code + 0x1C0) == 0xE5901018)))))
+            {
+                profile = 1;
+                const u32 global = U32(code + 0x10 + (U32(code + 8) & 0xFFF));
+                if (Range(global, 8)) owner = Read32(global + 4);
             }
             else if (U32(code) == 0xB081B5F0 && U32(code + 4) == 0x2A001C0D
                 && U16(code + 0x5C) == 0x30B0 && U16(code + 0x66) == 0x32F0
@@ -672,6 +825,27 @@ struct WMService::Impl
                 profile = 2;
                 const u32 global = U32(code + 0x190);
                 if (Range(global, 4)) owner = Read32(global);
+            }
+            else if ((offset & 3) == 0 && U32(code + 8) == 0xE3520000
+                && ((U32(code) == 0xE92D41F0 && U32(code + 4) == 0xE1A07001 && U32(code + 0x14) == 0xE59F0270
+                    && U32(code + 0x98) == 0xE59210AC && U32(code + 0xA4) == 0xE59210EC
+                    && U32(code + 0xB8) == 0xE1D114B6 && U32(code + 0x148) == 0xE1D114B6
+                    && U32(code + 0x214) == 0xE59200AC && U32(code + 0x220) == 0xE59210EC)
+                || (U32(code) == 0xE92D47F0 && U32(code + 4) == 0xE24DD008
+                    && U32(code + 0xC) == 0xE1A09001 && U32(code + 0x1C) == 0xE59F033C
+                    && U32(code + 0xC0) == 0xE59210B8 && U32(code + 0xCC) == 0xE59210F8
+                    && U32(code + 0xE0) == 0xE1D114B6 && U32(code + 0x170) == 0xE1D114B6
+                    && U32(code + 0x2D4) == 0xE59200B8 && U32(code + 0x2E0) == 0xE59210F8)))
+            {
+                const bool expanded = U32(code) == 0xE92D47F0;
+                const u32 global = U32(code + (expanded ? 0x360 : 0x28C));
+                const u32 getter = RegisteredEarlyGetter(0x02000000 + offset, expanded);
+                if (getter && Range(global, 4) && !(global & 3) && HasLegacyMPProducer(global, getter))
+                {
+                    profile = 5;
+                    abi = expanded ? &ExpandedEarlyRetailABI : &EarlyRetailABI;
+                    owner = Read32(global);
+                }
             }
             else if ((offset & 3) == 0 && U32(code) == 0xE92D47F0 && U32(code + 4) == 0xE24DD008
                 && U32(code + 8) == 0xE3520000 && U32(code + 12) == 0xE1A09001
@@ -688,18 +862,22 @@ struct WMService::Impl
                     owner = Read32(global);
             }
             if (!profile || !Range(owner, 0x154) || (owner & 3)) continue;
-            const auto& abi = ABIFor(profile);
-            if (wm7 != owner + abi.WM7Base
-                || status != owner + abi.StatusBase
-                || reply != owner + abi.ReplyBase
+            if (!abi) abi = &ABIFor(profile);
+            const auto& workAreas = profile == 4 && wm7 == owner + LegacyRetailABI.WM7Base
+                ? LegacyRetailABI : *abi;
+            if (wm7 != owner + workAreas.WM7Base
+                || status != owner + workAreas.StatusBase
+                || reply != owner + workAreas.ReplyBase
                 || Read32(owner) != wm7 || Read32(owner + 4) != status
                 || Read32(owner + 0x10) != reply) continue;
             ++found;
             foundProfile = profile;
+            foundABI = abi;
             foundOwner = owner;
         }
-        if (found != 1 || (request.API() == 3 && !ABIFor(foundProfile).Modern && !ABIFor(foundProfile).SplitPower)) return false;
+        if (found != 1 || (request.API() == 3 && !foundABI->SplitPower)) return false;
         Profile = foundProfile;
+        LocalABI = foundABI;
         WM9 = foundOwner;
         WM7 = wm7;
         Status = status;
@@ -722,11 +900,18 @@ struct WMService::Impl
             Fail("callback capacity");
             return false;
         }
-        if (U16(callback.Data.data()) == 38 && ScanToken)
+        if (ScanToken && U16(callback.Data.data()) == ScanRequest.API())
         {
             callback.ScanToken = ScanToken;
             callback.ScanEpoch = ScanEpoch;
             callback.ScanOwner = ScanOwner;
+        }
+        if (ActiveRequest.AwaitingResult && U16(callback.Data.data()) == ActiveRequest.API
+            && (ActiveRequest.API != 12 || !ConnectPending)
+            && (ActiveRequest.API != 14 || U16(callback.Data.data() + 2) || U16(callback.Data.data() + 4) == 10))
+        {
+            callback.ReturnsRequest = true;
+            ActiveRequest.AwaitingResult = false;
         }
         Callbacks.push_back(std::move(callback));
         return true;
@@ -758,9 +943,9 @@ struct WMService::Impl
     void NewEpoch()
     {
         Intent = {};
+        MPStartDeadline = 0;
         ClearBeaconPhase();
         InvalidateScanEx();
-        ScanExConfigured = false;
         ScanSSIDPrefix = 32;
         u64 observed = EpochCounter.load(std::memory_order_relaxed);
         do { Epoch = std::max(observed + 1, Now()); }
@@ -991,20 +1176,72 @@ struct WMService::Impl
             && !Console.IPCFIFO9.IsEmpty() && (Console.IPCFIFO9.Peek() & 0x3F) == 0xA;
     }
 
+    void FillChannelMeasurement(Callback& result, u16 channel) const
+    {
+        u16 busy = 0;
+        for (const auto& peer : Peers)
+            if (peer.BSS.size() == 192 && U16(peer.BSS.data() + 0x36) == channel && Now() - peer.Seen < 3000000) busy = 100;
+        Put16(result.Data.data() + 8, channel);
+        Put16(result.Data.data() + 10, busy);
+    }
+
+    void BeginIdleTransition(const Request& request, u16 measureChannel = 0)
+    {
+        const bool type2 = Console.GetFirmware().GetHeader().RFChipType == Firmware::RFChipType::Type2;
+        const u64 startupTicks = TicksPerMillisecond * (type2 ? 48 : 8)
+            + (request.API() == 0 ? Layout().InitSetupTicks : 0);
+        const u64 measureTicks = measureChannel ? TicksPerMillisecond * request.Half(8) : 0;
+        RadioTransition = {request.Address, request.API(), measureChannel, Console.SysTimestamp + (startupTicks + measureTicks) / 64 * 64};
+        if (measureChannel) RadioTransition.Class1At = Console.SysTimestamp + startupTicks / 64 * 64;
+    }
+
+    void BeginRadioShutdown(const Request& request)
+    {
+        RadioTransition = {request.Address, request.API(), 0, Console.SysTimestamp + TicksPerMillisecond / 4};
+    }
+
+    void ReturnActiveRequest()
+    {
+        Write32(Status + 4, 0);
+        Write16(ActiveRequest.Address, ActiveRequest.API | 0x8000);
+        ActiveRequest = {};
+    }
+
     void Drain()
     {
-        if (Mode != Backend::HLE || Terminal || Closing || !(Console.IPCFIFOCnt7 & 0x8000)) return;
+        if (Mode != Backend::HLE || Terminal || Closing) return;
+        if (MPStartDeadline && (Failed || Console.SysTimestamp >= MPStartDeadline))
+        {
+            MPStartDeadline = 0;
+            if (Failed || State() != (Parent ? 7 : 8))
+            {
+                Write32(Status + MPOffset(), 0);
+                Queue(Result(14, Failed ? 1 : 3));
+            }
+            else FinishMPStart();
+        }
+        if (RadioTransition.Class1At && !Failed && Console.SysTimestamp >= RadioTransition.Class1At)
+        {
+            State(3);
+            Write16(Status + Layout().PowerSave, 1);
+            RadioTransition.Class1At = 0;
+        }
+        if (RadioTransition.Address && (Failed || Console.SysTimestamp >= RadioTransition.Deadline))
+            FinishRadioTransition();
+        if (Closing || !(Console.IPCFIFOCnt7 & 0x8000)) return;
         while (BlocksARM7() && Callbacks.size() < MaxCallbacks - 64)
         {
             const u32 word = Console.IPCFIFO9.Peek();
             if (Requests.empty() || Requests.front().Word != word) { Fail("FIFO capture order"); return; }
-            if (ScanToken || (Profile == 1 && Requests.front().API() == 38 && ScanPending)) break;
+            if (RadioTransition.Address || ScanToken || MPStartDeadline || ActiveRequest.Address) break;
             Request request = std::move(Requests.front());
             Requests.pop_front();
             Console.IPCFIFO9.Read();
             ++AcceptedRequests;
-            if (Layout().LegacyRetail()) Write32(Status + 4, 1);
-            const bool scanDispatch = Profile == 1 && request.Valid && request.API() == 38;
+            if (Layout().ReturnsRequestAfterHandler && Range(request.Address, request.Data.size()))
+                ActiveRequest = {request.Address, request.API(), false};
+            if (Layout().LegacyRetail() || ActiveRequest.Address) Write32(Status + 4, 1);
+            const bool scanDispatch = Profile == 1 && request.Valid && (request.API() == 10 || request.API() == 38);
             if (scanDispatch)
             {
                 ScanRequest = request;
@@ -1013,9 +1250,20 @@ struct WMService::Impl
                 ScanEpoch = Epoch;
                 ScanOwner = WM9;
             }
+            const size_t callbacksBefore = Callbacks.size();
             Handle(request);
+            if (ActiveRequest.Address)
+            {
+                if (RadioTransition.Address || MPStartDeadline || (request.API() == 10 && ScanPending) || (request.API() == 12 && ConnectPending))
+                    ActiveRequest.AwaitingResult = true;
+                else if (Callbacks.size() > callbacksBefore)
+                    Callbacks.back().ReturnsRequest = true;
+                else
+                    ReturnActiveRequest();
+            }
             if (Layout().LegacyRetail()) Write32(Status + 4, 0);
-            if (!Layout().Firmware && request.Valid && !scanDispatch) Write16(request.Address, request.API() | 0x8000);
+            if (!Layout().Early && request.Valid && !scanDispatch && !RadioTransition.Address)
+                Write16(request.Address, request.API() | 0x8000);
             if (Console.IPCFIFO9.IsEmpty() && (Console.IPCFIFOCnt9 & 4)) Console.SetIRQ(0, IRQ_IPCSendDone);
             if (Failed || Closing) break;
         }
@@ -1041,6 +1289,7 @@ struct WMService::Impl
                 Closing = false;
                 Status = WM7 = WM9 = Reply = 0;
                 Profile = 0;
+                LocalABI = &RetailABI;
             }
         }
         if (ScanToken && (ScanEpoch != Epoch || ScanOwner != WM9)) InvalidateScanEx();
@@ -1062,8 +1311,11 @@ struct WMService::Impl
                 Write(Reply + 12, CurrentCallback.Data.data() + 12, 22);
         }
         else if (Layout().SplitPower && api >= 3 && api <= 6)
-            Write(Reply, CurrentCallback.Data.data(), U16(CurrentCallback.Data.data() + 2) == 1 ? 8 : 4);
-        else if (Layout().LegacyRetail() && api == 33)
+        {
+            const bool wlError = U16(CurrentCallback.Data.data() + 2) == 1 && (!Layout().Modern || api >= 5);
+            Write(Reply, CurrentCallback.Data.data(), wlError ? 8 : 4);
+        }
+        else if ((Layout().SupportsSetEntry && api == 33) || (Layout().ShortGameInfoResult && api == 24))
             Write(Reply, CurrentCallback.Data.data(), U16(CurrentCallback.Data.data() + 2) == 1 ? 8 : 4);
         else if (Layout().LegacyRetail() && api == 35)
             Write(Reply, CurrentCallback.Data.data(), 4);
@@ -1081,6 +1333,7 @@ struct WMService::Impl
         InFlight = true;
         ++PublishedCallbacks;
         Console.ARM7IOWrite32(0x04000188, (Reply << 6) | 0xA);
+        if (CurrentCallback.ReturnsRequest) ReturnActiveRequest();
         if (CurrentCallback.ScanToken && OwnsScan(CurrentCallback))
         {
             Write16(ScanRequest.Address, ScanRequest.API() | 0x8000);
@@ -1094,7 +1347,10 @@ struct WMService::Impl
         }
     }
 
-    void InitializeLegacyPower();
+    void InitializePower();
+    void FinishRadioTransition();
+    void FinishReset(u16 api);
+    void FinishMPStart();
     void Handle(const Request& request);
     void Network(const WMServicePacket& packet);
     void Tick();
@@ -1176,7 +1432,7 @@ struct WMService::Impl
 
 void WMService::Impl::BuildGameInfo(const Bytes& payload)
 {
-    const u32 shift = Layout().Firmware ? 2 : 0;
+    const u32 shift = Layout().ParentParamShift;
     GameInfo.assign(16 + payload.size(), 0);
     Put16(GameInfo.data(), 1);
     GameInfo[2] = Layout().Modern ? 1 : 0;
@@ -1208,7 +1464,7 @@ void WMService::Impl::SetSizes()
     }
     else if ((Parent || Layout().LegacyRetail()) && (State() == 7 || State() == 8 || State() == 9 || State() == 10))
     {
-        const bool keySharing = Parent ? U16(ParentParameters.data() + (Layout().Firmware ? 0x12 : 0x14)) != 0
+        const bool keySharing = Parent ? U16(ParentParameters.data() + 0x14 - Layout().ParentParamShift) != 0
             : ConnectRequest.Payload.size() == 192 && (ConnectRequest.Payload[0x4B] & 4);
         const u16 parent = ParentSize + 4 + (keySharing ? 42 : 0);
         const u16 child = ChildSize + 2 + (keySharing ? 6 : 0);
@@ -1308,7 +1564,7 @@ void WMService::Impl::Advertisement()
         }
         else sent |= Send(id, Message::Advertisement, ParentBSS.data(), ParentBSS.size());
     }
-    if ((sent || (Layout().Firmware && !hasReceiver)) && BeaconIndication.value_or(Layout().Firmware))
+    if ((sent || (Layout().Early && !hasReceiver)) && BeaconIndication.value_or(Layout().Early))
     {
         auto result = Result(8);
         Put16(result.Data.data() + 8, 2);
@@ -1457,38 +1713,44 @@ void WMService::Impl::TryScan(unsigned received, u64 cause)
         else AdvanceScanEx();
         return;
     }
-    const MAC filter = ReadMAC(ScanRequest.Data.data() + 10);
-    const bool wildcard = std::all_of(filter.begin(), filter.end(), [](u8 value) { return value == 0xFF; });
-    if (received < Peers.size() && Console.SysTimestamp <= ScanDeadline)
+    const u64 now = Console.SysTimestamp;
+    const bool modern = Layout().Modern;
+    const u64 finish = ScanDeadline + (modern ? ScanReturnTicks : 0);
+    if (received >= Peers.size() && now < finish) return;
+    if (ScanCount) PruneScanEx();
+    if (!ScanCount && received < Peers.size() && now >= ScanListenStart
+        && (modern ? now < ScanDeadline : now <= ScanDeadline))
     {
         const auto& peer = Peers[received];
-        const u16 channel = U16(peer.BSS.data() + 0x36);
-        if (channel == ScanRequest.Half(2) && (wildcard || filter == peer.Mac))
+        const MAC filter = ReadMAC(ScanRequest.Data.data() + 10);
+        const bool wildcard = std::all_of(filter.begin(), filter.end(), [](u8 value) { return value == 0xFF; });
+        if (U16(peer.BSS.data() + 0x36) == ScanRequest.Half(2) && (wildcard || filter == peer.Mac))
         {
-            auto result = Result(10);
-            Put16(result.Data.data() + 8, 5);
-            EncodeMAC(result.Data.data() + 10, peer.Mac);
-            Put16(result.Data.data() + 0x10, channel);
-            Put16(result.Data.data() + 0x12, 3);
-            Put16(result.Data.data() + 0x14, U16(peer.BSS.data() + 10));
-            std::copy(peer.BSS.begin() + 12, peer.BSS.begin() + 44, result.Data.begin() + 0x16);
-            const u16 length = U16(peer.BSS.data() + 0x3C);
-            Put16(result.Data.data() + 0x36, length);
-            std::copy(peer.BSS.begin() + 0x40, peer.BSS.begin() + 0x40 + length, result.Data.begin() + 0x38);
-            result.Receive = peer.BSS;
-            result.ReceiveBase = ScanRequest.Arg(4);
-            Queue(std::move(result));
-            ScanPending = false;
-            return;
+            ScanData = peer.BSS;
+            ScanObservations[0] = {peer.Epoch, 0, BSSSize, static_cast<u8>(received)};
+            ScanCount = 1;
         }
     }
-    if (Console.SysTimestamp >= ScanDeadline)
+    if (now < finish && (modern || !ScanCount)) return;
+
+    auto result = Result(10);
+    Put16(result.Data.data() + 8, ScanCount ? 5 : 4);
+    if (ScanCount)
     {
-        auto result = Result(10);
-        Put16(result.Data.data() + 8, 4);
-        Queue(std::move(result));
-        ScanPending = false;
+        EncodeMAC(result.Data.data() + 10, ReadMAC(ScanData.data() + 4));
+        Put16(result.Data.data() + 0x10, U16(ScanData.data() + 0x36));
+        Put16(result.Data.data() + 0x12, 3);
+        Put16(result.Data.data() + 0x14, U16(ScanData.data() + 10));
+        std::copy_n(ScanData.data() + 12, 32, result.Data.data() + 0x16);
+        const u16 length = U16(ScanData.data() + 0x3C);
+        Put16(result.Data.data() + 0x36, length);
+        std::copy_n(ScanData.data() + 0x40, length, result.Data.data() + 0x38);
+        result.Receive = std::move(ScanData);
+        result.ReceiveBase = ScanRequest.Arg(4);
     }
+    Queue(std::move(result));
+    ScanCount = ScanBytes = 0;
+    ScanPending = false;
 }
 
 void WMService::Impl::TryConnect()
@@ -1568,7 +1830,7 @@ void WMService::Impl::TryConnect()
     State(6);
     auto result = Result(12);
     Put16(result.Data.data() + 8, 6);
-    if (Queue(std::move(result)) && !Layout().Firmware)
+    if (Queue(std::move(result)) && !Layout().Early)
         Write16(Status + Layout().PowerSave, request.Arg(0x20) != 0);
 }
 
@@ -1579,7 +1841,7 @@ void WMService::Impl::Complete(Operation& operation, u16 error)
     Put16(result.Data.data() + 10, operation.Port);
     Put16(result.Data.data() + 12, operation.RequestedDestinations);
     const u16 length = operation.Size;
-    if (Layout().Firmware)
+    if (Layout().Early)
     {
         Put16(result.Data.data() + 14, length);
         Put32(result.Data.data() + 16, operation.DataAddress);
@@ -1624,7 +1886,9 @@ void WMService::Impl::Disconnect(unsigned id, bool notify, std::optional<u16> re
         Send(id, Message::Disconnect, data.data(), data.size());
     }
     auto result = Result(Parent ? 8 : 12);
-    Put16(result.Data.data() + 8, 9);
+    const bool localRequest = notify && reason == LocalDisconnectReason;
+    Put16(result.Data.data() + 8, localRequest ? 26 : 9);
+    if (localRequest) Put16(result.Data.data() + (Parent ? 18 : 12), LocalDisconnectReason);
     LastSeen(Parent ? peer.AID : 0, 0);
     if (Parent)
     {
@@ -1637,10 +1901,10 @@ void WMService::Impl::Disconnect(unsigned id, bool notify, std::optional<u16> re
         }
         if (!Layout().Modern)
         {
-            Put16(result.Data.data() + 18, Layout().Firmware ? reason.value_or(0) : 3);
+            Put16(result.Data.data() + 18, Layout().Early ? reason.value_or(0) : 3);
             const MAC empty{};
             StoreMAC(Status + Layout().ChildMACs + (peer.AID - 1) * 6, empty);
-            if (Layout().Firmware) Write16(Status + Layout().Ready, Read16(Status + Layout().Ready) & ~(1u << peer.AID));
+            if (Layout().Early) Write16(Status + Layout().Ready, Read16(Status + Layout().Ready) & ~(1u << peer.AID));
         }
         Members &= ~(1u << peer.AID);
     }
@@ -1658,7 +1922,7 @@ void WMService::Impl::Disconnect(unsigned id, bool notify, std::optional<u16> re
         }
         if (!Layout().Modern)
         {
-            Put16(result.Data.data() + 12, Layout().Firmware ? reason.value_or(0) : 3);
+            Put16(result.Data.data() + 12, Layout().Early ? reason.value_or(0) : 3);
             if (Layout().LegacyRetail()) Write16(Status + Layout().Indications, 0);
         }
         Radio.Stop(Console.SysTimestamp);
@@ -1686,21 +1950,98 @@ void WMService::Impl::Disconnect(unsigned id, bool notify, std::optional<u16> re
     }
 }
 
-void WMService::Impl::InitializeLegacyPower()
+void WMService::Impl::InitializePower()
 {
+    const auto& abi = Layout();
+    Write16(Status + abi.AllowedChannels, AllowedChannels);
+    Write16(Status + abi.MPChannels, Profile == 2 ? AllowedChannels >> 1 : MPChannels(AllowedChannels));
+    StoreMAC(Status + abi.LocalMAC, Mac);
+    if (abi.SplitPower)
+    {
+        Write16(Status + (abi.Modern ? 0x1EC : 0x1E8), 2);
+        Write16(Status + (abi.Modern ? 0x1EE : 0x1EA), 1);
+    }
+    if (!abi.Lifetime) return;
+
     LifeTime = 40;
     LifeTimes = {0xFFFF, 0xFFFF, 0xFFFF, 40};
     FrameLifeTime = 5;
-    CAMLifeTimes.fill(0xFFFF);
-    BeaconIndication = true;
-    if (Layout().SplitPower)
-    {
-        Write16(Status + 0x1E8, 2);
-        Write16(Status + 0x1EA, 1);
-    }
+    CAMLifeTimes.fill(abi.Early ? 40 : 0xFFFF);
+    if (abi.LegacyRetail()) BeaconIndication = true;
     const u64 ticks = (33514ULL * LifeTime * 100) / 64;
-    Write32(Status + Layout().Lifetime, ticks);
-    Write32(Status + Layout().Lifetime + 4, ticks >> 32);
+    Write32(Status + abi.Lifetime, ticks);
+    Write32(Status + abi.Lifetime + 4, ticks >> 32);
+}
+
+void WMService::Impl::FinishReset(u16 api)
+{
+    Radio.Stop(Console.SysTimestamp);
+    CancelOperations(15);
+    for (unsigned id = 0; id < 16; id++) Disconnect(id, true);
+    MP = Parent = ScanPending = ConnectPending = false;
+    Members = OwnAID = 0;
+    ParentID = -1;
+    GameInfo.clear();
+    ParentBSS.clear();
+    Write32(Status + MPOffset(), 0);
+    Write16(Status + Layout().Members, 0);
+    Write16(Status + Layout().Link, 0);
+    Write16(Status + Layout().AID, 0);
+    if (!Layout().Early) Write16(Status + Layout().Ready, 0);
+    if (!Layout().Modern)
+    {
+        Write16(Status + Layout().EffectiveTX, 0);
+        Write16(Status + Layout().EffectiveRX, 0);
+    }
+    if (Layout().LegacyRetail()) Write16(Status + Layout().Indications, 0);
+    State(api == 2 ? 0 : 2);
+    auto result = Result(api);
+    result.End = api == 2;
+    Closing = api == 2;
+    Queue(std::move(result));
+    NewEpoch();
+}
+
+void WMService::Impl::FinishRadioTransition()
+{
+    const u16 api = RadioTransition.API;
+    if (Failed)
+        Queue(Result(api, 1));
+    else if (api == 2)
+        FinishReset(api);
+    else
+    {
+        auto result = Result(api);
+        if (api == 0 || api == 5) InitializePower();
+        else if (api == 30) FillChannelMeasurement(result, RadioTransition.MeasureChannel);
+        else if (api == 11 && !Read16(Status + 0x1EE)) Write16(Status + 0x1EE, 1);
+        State(api == 6 ? 1 : 2);
+        Queue(std::move(result));
+    }
+    if (!ActiveRequest.Address) Write16(RadioTransition.Address, api | 0x8000);
+    RadioTransition = {};
+}
+
+void WMService::Impl::FinishMPStart()
+{
+    MP = true;
+    ClearRounds();
+    MPGeneration = NextMPGeneration++;
+    LastVCount = Console.GPU.VCount;
+    ChildVSync = true;
+    State(Parent ? 9 : 10);
+    auto result = Result(14);
+    Put16(result.Data.data() + 4, 10);
+    if (!Queue(std::move(result))) return;
+    for (unsigned id = 0; id < 16; id++)
+    {
+        if (!Peers[id].Connected) continue;
+        std::array<u8, 18> data{};
+        Put64(data.data(), Peers[id].Connection);
+        Put16(data.data() + 8, 1);
+        Put64(data.data() + 10, MPGeneration);
+        if (!Send(id, Message::MPState, data.data(), data.size())) Fail("MP state enqueue");
+    }
 }
 
 void WMService::Impl::Handle(const Request& request)
@@ -1714,22 +2055,17 @@ void WMService::Impl::Handle(const Request& request)
     case 0:
     case 3:
     {
-        if (api == 3 && !Layout().Modern && !Layout().SplitPower) { Queue(Result(api, 4)); break; }
+        if (api == 3 && !Layout().SplitPower) { Queue(Result(api, 4)); break; }
         if (Initialized) { Queue(Result(api, 3)); break; }
         Write32(WM7, Status);
         Write32(WM7 + 8, Reply);
-        Write32(Status + 4, 0);
+        if (!ActiveRequest.Address) Write32(Status + 4, 0);
         Write32(Status + MPOffset(), 0);
         Write16(Status + Layout().Members, 0);
         Write16(Status + Layout().Link, 0);
         Write16(Status + Layout().AID, 0);
-        if (!Layout().SplitPower || api == 0)
-        {
-            Write16(Status + Layout().AllowedChannels, AllowedChannels);
-            Write16(Status + Layout().MPChannels, Layout().LegacyRetail() ? MPChannels(AllowedChannels) : AllowedChannels >> 1);
-            StoreMAC(Status + Layout().LocalMAC, Mac);
-        }
-        State(api == 3 ? 1 : 2);
+        const bool powerOn = api == 0 && (Layout().Modern || Layout().InitSetupTicks);
+        State(api == 3 || powerOn ? 1 : 2);
         Initialized = EverActive = true;
         MPParameters = {};
         Put32(MPParameters.data(), 0x3FFF);
@@ -1741,6 +2077,8 @@ void WMService::Impl::Handle(const Request& request)
         Put16(MPParameters.data() + 20, 240);
         if (Layout().Modern)
         {
+            BeaconIndication = false;
+            Write16(Status + 0x1EE, 1);
             Write16(Status + Layout().PowerSave, 0);
             Write16(Status + Layout().Ready, 0);
             ApplyParameters(MPParameters.data(), nullptr);
@@ -1751,29 +2089,42 @@ void WMService::Impl::Handle(const Request& request)
             Write16(Status + Layout().Ready, 0);
             Write16(Status + Layout().Indications, 0);
             for (u16 aid = 0; aid < 16; aid++) LastSeen(aid, 0);
-            if (Layout().SplitPower)
+        }
+        if (!Layout().Modern && Layout().SplitPower)
+        {
+            Write32(Status + 0x14, 0);
+            Write16(Status + Layout().Booleans, 0);
+            Write16(Status + Layout().Booleans + 2, 0);
+            Write16(Status + Layout().Booleans + 4, 0);
+            Write16(Status + Layout().EffectiveTX, 0);
+            Write16(Status + Layout().EffectiveRX, 0);
+            if (Layout().Early)
+            {
+                Write32(Status + 0x18, 0);
+                for (unsigned i = 0; i < 512; i += 2) Write16(Status + Layout().MPChannels + 2 + i, 1);
+            }
+            else
             {
                 Write32(Status + 0x10, 0);
-                Write32(Status + 0x14, 0);
                 Write32(Status + 0x1C, 0);
-                Write16(Status + Layout().Booleans, 0);
-                Write16(Status + Layout().Booleans + 2, 0);
-                Write16(Status + Layout().Booleans + 4, 0);
-                Write16(Status + Layout().EffectiveTX, 0);
-                Write16(Status + Layout().EffectiveRX, 0);
                 Write16(Status + 0xCA, 0);
                 Write16(Status + 0x1EA, 1);
             }
-            if (!Layout().SplitPower || api == 0) InitializeLegacyPower();
         }
-        Queue(Result(api));
+        if (powerOn)
+            BeginIdleTransition(request);
+        else
+        {
+            if (api == 0) InitializePower();
+            Queue(Result(api));
+        }
         Platform::Log(Platform::LogLevel::Info, "WMHLE initialized profile=%u epoch=%llu channels=%04X\n",
             Profile, static_cast<unsigned long long>(Epoch), AllowedChannels);
         break;
     }
     case 4:
     {
-        if (!Layout().Modern && !Layout().SplitPower) { Queue(Result(api, 4)); break; }
+        if (!Layout().SplitPower) { Queue(Result(api, 4)); break; }
         if (State() != 1) { Queue(Result(api, 3)); break; }
         State(0);
         auto result = Result(api);
@@ -1787,13 +2138,13 @@ void WMService::Impl::Handle(const Request& request)
     {
         if (!Layout().SplitPower) { Queue(Result(api, 4)); break; }
         if (State() != (api == 5 ? 1 : 2)) { Queue(Result(api, 3)); break; }
-        if (api == 5)
+        if (Layout().Modern)
         {
-            Write16(Status + Layout().AllowedChannels, AllowedChannels);
-            Write16(Status + Layout().MPChannels, MPChannels(AllowedChannels));
-            StoreMAC(Status + Layout().LocalMAC, Mac);
-            InitializeLegacyPower();
+            if (api == 5) BeginIdleTransition(request);
+            else BeginRadioShutdown(request);
+            break;
         }
+        if (api == 5) InitializePower();
         State(api == 5 ? 2 : 1);
         Queue(Result(api));
         break;
@@ -1801,43 +2152,20 @@ void WMService::Impl::Handle(const Request& request)
     case 1:
     case 2:
     {
-        if (Layout().LegacyRetail() && api == 2 && State() != 2) { Queue(Result(api, 3)); break; }
-        Radio.Stop(Console.SysTimestamp);
-        CancelOperations(15);
-        for (unsigned id = 0; id < 16; id++) Disconnect(id, true);
-        MP = Parent = ScanPending = ConnectPending = false;
-        Members = OwnAID = 0;
-        ParentID = -1;
-        GameInfo.clear();
-        ParentBSS.clear();
-        Write32(Status + MPOffset(), 0);
-        Write16(Status + Layout().Members, 0);
-        Write16(Status + Layout().Link, 0);
-        Write16(Status + Layout().AID, 0);
-        if (!Layout().Firmware) Write16(Status + Layout().Ready, 0);
-        if (!Layout().Modern)
-        {
-            Write16(Status + Layout().EffectiveTX, 0);
-            Write16(Status + Layout().EffectiveRX, 0);
-        }
-        if (Layout().LegacyRetail()) Write16(Status + Layout().Indications, 0);
-        State(api == 2 ? 0 : 2);
-        auto result = Result(api);
-        result.End = api == 2;
-        Closing = api == 2;
-        Queue(std::move(result));
-        NewEpoch();
+        if (!Layout().Early && api == 2 && State() != 2) { Queue(Result(api, 3)); break; }
+        if (api == 2 && Layout().Modern) BeginRadioShutdown(request);
+        else FinishReset(api);
         break;
     }
     case 7:
     {
         if (State() != 2) { Queue(Result(api, 3)); break; }
-        const u32 shift = Layout().Firmware ? 2 : 0;
+        const u32 shift = Layout().ParentParamShift;
         const u16 channel = U16(request.Payload.data() + 0x32 - shift);
         const u16 parentSize = U16(request.Payload.data() + 0x34 - shift);
         const u16 childSize = U16(request.Payload.data() + 0x36 - shift);
         const u16 maxEntry = U16(request.Payload.data() + 0x10 - shift);
-        if (Layout().LegacyRetail())
+        if (!Layout().Modern && shift == 0)
         {
             std::copy(request.Payload.begin(), request.Payload.end(), ParentParameters.begin());
             Write(Status + Layout().ParentParameters, ParentParameters.data(), ParentParameters.size());
@@ -1889,7 +2217,7 @@ void WMService::Impl::Handle(const Request& request)
         if (State() != 7) { Queue(Result(api, 3)); break; }
         Radio.Stop(Console.SysTimestamp);
         for (unsigned id = 0; id < 16; id++)
-            Disconnect(id, true, Layout().Firmware ? std::nullopt : std::optional<u16>{3});
+            Disconnect(id, true, Layout().Early ? std::nullopt : std::optional<u16>{3});
         Parent = false;
         ParentBSS.clear();
         if (!Layout().Modern)
@@ -1907,6 +2235,7 @@ void WMService::Impl::Handle(const Request& request)
         Queue(Result(api));
         break;
     case 10:
+    {
         if ((State() != 2 && State() != 3 && State() != 5) || ScanPending)
         { Queue(Result(api, 3)); break; }
         if (!Range(request.Arg(4), 192) || request.Half(2) < 1 || request.Half(2) > 13
@@ -1914,7 +2243,14 @@ void WMService::Impl::Handle(const Request& request)
         if (State() == 2) ScanSSIDPrefix = 8;
         ScanRequest = request;
         ScanPending = true;
-        ScanDeadline = Console.SysTimestamp + std::max<u64>(1, request.Half(8)) * 1024 * 33514 / 1000;
+        const u64 dwell = std::max<u64>(1, request.Half(8));
+        const u64 scanTicks = Layout().Modern ? (TicksPerMillisecond * dwell / 64) * 64
+                                              : dwell * 1024 * TicksPerMillisecond / 1000;
+        const u64 timerStart = Console.SysTimestamp + (Layout().Modern ? ScanSetupTicks : 0);
+        ScanListenStart = timerStart + (Layout().Modern ? ScanWakeTicks : 0);
+        ScanDeadline = timerStart + scanTicks;
+        ScanCount = ScanBytes = 0;
+        ScanData.clear();
         Write32(Status + Layout().ScanBuffer, request.Arg(4));
         Write16(Status + Layout().Channel, request.Half(2));
         if (Layout().LegacyRetail())
@@ -1925,6 +2261,7 @@ void WMService::Impl::Handle(const Request& request)
         State(5);
         TryScan();
         break;
+    }
     case 38:
     {
         if (Profile != 1) { Queue(Result(api, 4)); break; }
@@ -1949,7 +2286,6 @@ void WMService::Impl::Handle(const Request& request)
         }
         if (type >= 2) ScanSSIDPrefix = request.Half(54);
         Write16(Status + 0x1EE, type & 1);
-        ScanExConfigured = true;
         State(5);
         const u16 dwell = request.Half(10);
         if (dwell < 10 || dwell > 1000)
@@ -1982,10 +2318,10 @@ void WMService::Impl::Handle(const Request& request)
             Queue(std::move(result));
         }
         ScanPending = false;
-        if (ScanExConfigured)
+        if (Layout().Modern)
         {
-            Write16(Status + 0x1EE, 1);
-            ScanExConfigured = false;
+            BeginIdleTransition(request);
+            break;
         }
         State(2);
         Queue(Result(api));
@@ -2011,7 +2347,10 @@ void WMService::Impl::Handle(const Request& request)
         u16 removed = 0;
         for (unsigned id = 0; id < 16; id++)
             if (Peers[id].Connected && (wanted & (Parent ? (1u << Peers[id].AID) : 1)))
-            { removed |= Parent ? (1u << Peers[id].AID) : 1; Disconnect(id, true, 0x24); }
+            {
+                removed |= Parent ? (1u << Peers[id].AID) : 1;
+                Disconnect(id, true, Layout().Modern ? LocalDisconnectReason : 0x24);
+            }
         auto result = Result(api);
         Put16(result.Data.data() + 8, wanted);
         Put16(result.Data.data() + 10, removed);
@@ -2069,25 +2408,11 @@ void WMService::Impl::Handle(const Request& request)
         Write32(Status + RXOffset() + 4, RX + RXSize);
         Write32(Status + RXOffset() + 8, TX);
         Write16(Status + RXOffset() + 12, TXSize);
-        MP = true;
-        ClearRounds();
-        MPGeneration = NextMPGeneration++;
-        LastVCount = Console.GPU.VCount;
-        ChildVSync = true;
         Write32(Status + MPOffset(), 1);
-        State(Parent ? 9 : 10);
-        auto result = Result(api);
-        Put16(result.Data.data() + 4, 10);
-        if (!Queue(std::move(result))) break;
-        for (unsigned id = 0; id < 16; id++)
-        {
-            if (!Peers[id].Connected) continue;
-            std::array<u8, 18> data{};
-            Put64(data.data(), Peers[id].Connection);
-            Put16(data.data() + 8, 1);
-            Put64(data.data() + 10, MPGeneration);
-            if (!Send(id, Message::MPState, data.data(), data.size())) Fail("MP state enqueue");
-        }
+        if (Layout().Early && Layout().LastSeen)
+            for (u16 aid = 0; aid < 16; aid++) LastSeen(aid, (Console.SysTimestamp / 64) | 1);
+        if (Layout().MPStartupTicks) MPStartDeadline = Console.SysTimestamp + Layout().MPStartupTicks;
+        else FinishMPStart();
         break;
     }
     case 15:
@@ -2139,25 +2464,18 @@ void WMService::Impl::Handle(const Request& request)
     case 24:
     {
         if (GameInfo.size() < 16) { Queue(Result(api, 3)); break; }
-        GameInfo.resize(16 + request.Payload.size());
-        const u32 ggid = Layout().Firmware ? request.Half(12) | (u32(request.Half(16)) << 16) : request.Arg(12);
-        Put32(GameInfo.data() + 4, ggid);
-        Put16(GameInfo.data() + 8, request.Half(Layout().Firmware ? 20 : 16));
-        GameInfo[10] = request.Payload.size();
-        GameInfo[11] = request.Arg(Layout().Firmware ? 24 : 20);
-        std::copy(request.Payload.begin(), request.Payload.end(), GameInfo.begin() + 16);
-        if (!Layout().Modern)
-        {
-            GameInfo[11] &= 0xF;
-            const unsigned shift = Layout().Firmware ? 2 : 0;
-            Put32(ParentParameters.data(), request.Arg(4));
-            Put16(ParentParameters.data() + 4, request.Half(8));
-            Put32(ParentParameters.data() + 8 - shift, ggid);
-            Put16(ParentParameters.data() + 12 - shift, U16(GameInfo.data() + 8));
-            for (unsigned bit = 0; bit < 4; bit++)
-                Put16(ParentParameters.data() + (bit == 0 ? 0xE : 0x10 + 2 * bit) - shift, (GameInfo[11] >> bit) & 1);
-            Write(Status + Layout().ParentParameters, ParentParameters.data(), ParentParameters.size());
-        }
+        const u32 base = Status + Layout().ParentParameters;
+        const u32 shift = Layout().ParentParamShift;
+        const u32 flags = request.Arg(shift ? 24 : 20);
+        Write32(base, request.Arg(4));
+        Write16(base + 4, request.Half(8));
+        Write16(base + 8 - shift, request.Half(12));
+        Write16(base + 10 - shift, request.Half(shift ? 16 : 14));
+        Write16(base + 12 - shift, request.Half(shift ? 20 : 16));
+        for (unsigned bit = 0; bit < 4; bit++)
+            Write16(base + (bit == 0 ? 0xE : 0x10 + 2 * bit) - shift, (flags >> bit) & 1);
+        std::copy_n(Memory(base), ParentParameters.size(), ParentParameters.begin());
+        BuildGameInfo(request.Payload);
         TraceGameInfo(request, request.Payload);
         Queue(Result(api));
         break;
@@ -2180,14 +2498,14 @@ void WMService::Impl::Handle(const Request& request)
             break;
         }
         LifeTimes[3] = 0xFFFF;
-        for (u32 i = 0; i < (Layout().Firmware ? 3u : 4u); i++) LifeTimes[i] = request.Half(4 + i * 4);
+        for (u32 i = 0; i < (Layout().Lifetime ? 4u : 3u); i++) LifeTimes[i] = request.Half(4 + i * 4);
         LifeTime = LifeTimes[3];
         if (frameLifeTime) FrameLifeTime = frameLifeTime;
         for (unsigned i = 1; i < 16; i++)
             if (table == 0xFFFF || table == i) CAMLifeTimes[i] = LifeTimes[1];
         for (auto& peer : Peers) peer.SeenEmulated = Console.SysTimestamp;
         for (u16 aid = 0; aid < 16; aid++) LastSeen(aid, (Console.SysTimestamp / 64) | 1);
-        if (!Layout().Firmware)
+        if (Layout().Lifetime)
         {
             const u64 tick = LifeTime == 0xFFFF ? 0 : LifeTime == 0 ? 1 : (33514ULL * LifeTime * 100) / 64;
             Write32(Status + Layout().Lifetime, tick);
@@ -2198,28 +2516,29 @@ void WMService::Impl::Handle(const Request& request)
     }
     case 30:
     {
-        if (Layout().LegacyRetail() && State() != 2) { Queue(Result(api, 3)); break; }
+        if (!Layout().Early && State() != 2) { Queue(Result(api, 3)); break; }
         const u16 channel = request.Half(6);
         if (channel < 1 || channel > 13 || !(AllowedChannels & (1u << channel)))
         { Queue(Result(api, 6)); break; }
-        u16 busy = 0;
-        for (const auto& peer : Peers)
-            if (peer.BSS.size() == 192 && U16(peer.BSS.data() + 0x36) == channel && Now() - peer.Seen < 3000000) busy = 100;
-        auto result = Result(api);
-        Put16(result.Data.data() + 8, channel);
-        Put16(result.Data.data() + 10, busy);
-        if (Layout().LegacyRetail())
+        if (!Layout().Early)
         {
             Write16(Status + Layout().OperatingMode, 2);
-            Write16(Status + Layout().PowerSave, 1);
+            if (!Layout().Modern) Write16(Status + Layout().PowerSave, 1);
         }
+        if (Layout().Modern)
+        {
+            BeginIdleTransition(request, channel);
+            break;
+        }
+        auto result = Result(api);
+        FillChannelMeasurement(result, channel);
         State(2);
         Queue(std::move(result));
         break;
     }
     case 33:
     {
-        if (!Layout().LegacyRetail()) { Queue(Result(api, 4)); break; }
+        if (!Layout().SupportsSetEntry) { Queue(Result(api, 4)); break; }
         if (GameInfo.size() < 16) { Queue(Result(api, 3)); break; }
         Bytes payload;
         std::copy_n(Memory(Status + Layout().ParentParameters), ParentParameters.size(), ParentParameters.begin());
@@ -2548,19 +2867,19 @@ void WMService::Impl::UpdateRoundBudget()
     if (!crossed || repeated) return;
     if (!Parent)
     {
-        if (!Prepared.ID && !Round.Packet.ID && (!Layout().Firmware || ChildVSync))
+        if (!Prepared.ID && !Round.Packet.ID && (!Layout().Early || ChildVSync))
         { ChildPrepareWait = ChildVSync; ChildVSync = false; ChildKick = true; }
         return;
     }
     if (!Members) { RoundCount = 0; return; }
     const u16 frequency = Layout().Modern ? U16(MPParameters.data() + 6) : Read16(Status + Layout().Frequency);
     if (Layout().Modern && RoundCount < 0) RoundCount = 0;
-    if (Layout().Firmware) RoundCount = std::min<u32>(u16(RoundCount + frequency), 256);
+    if (Layout().Early) RoundCount = std::min<u32>(u16(RoundCount + frequency), 256);
     else RoundCount = std::min<s32>(static_cast<s16>(RoundCount + frequency), 256);
     RoundLimit = Layout().Modern ? static_cast<s16>(U16(MPParameters.data() + 8))
-        : Layout().Firmware ? 256 : Read16(Status + Layout().Booleans + 4) ? frequency : 6;
+        : Layout().Early ? 256 : Read16(Status + Layout().Booleans + 4) ? frequency : 6;
     Write16(Status + (Layout().Modern ? 0x62 : Layout().Frequency + 2), RoundCount);
-    if (!Layout().Firmware) Write16(Status + (Layout().Modern ? 0x64 : 0x38), RoundLimit);
+    if (!Layout().Early) Write16(Status + (Layout().Modern ? 0x64 : 0x38), RoundLimit);
 }
 
 void WMService::Impl::StartRound()
@@ -2586,7 +2905,7 @@ void WMService::Impl::StartRound()
     next.Packet = PreparePacket(eligible);
     const bool minPoll = Layout().Modern ? MPParameters[24] != 0 : Read16(Status + Layout().Booleans) != 0;
     next.PollBitmap = minPoll && next.Packet.Destinations ? eligible & next.Packet.Destinations : eligible;
-    next.VSync = RoundCount == 1 || (!Layout().Firmware && RoundLimit == 1);
+    next.VSync = RoundCount == 1 || (!Layout().Early && RoundLimit == 1);
     next.WaitUntil = Now() + 25000;
     if (next.VSync) next.Packet.Header |= 0x8000;
     for (unsigned id = 0; id < Peers.size(); id++)
@@ -2747,7 +3066,7 @@ void WMService::Impl::ReceivePoll(unsigned id, const u8* data, u16 size)
         std::copy(Round.Packet.Data.begin(), Round.Packet.Data.end(), packet.begin() + 48);
         if (!Send(id, Message::RoundReply, packet.data(), packet.size())) Fail("round reply enqueue");
     }
-    if (!Round.Polled && !Layout().Firmware) return;
+    if (!Round.Polled && !Layout().Early) return;
     RXSelector ^= 1;
     Write16(Status + RXSelectorOffset(), RXSelector);
     const u32 receiveBase = RX + RXSelector * RXSize;
@@ -2763,7 +3082,7 @@ void WMService::Impl::ReceivePoll(unsigned id, const u8* data, u16 size)
     Put16(receive.data() + 14, 0xFF14);
     std::copy(Mac.begin(), Mac.end(), receive.begin() + 24);
     std::copy(peer.Mac.begin(), peer.Mac.end(), receive.begin() + 30);
-    if (Layout().Firmware) EncodeMAC(receive.data() + 24, peer.Mac);
+    if (Layout().Early) EncodeMAC(receive.data() + 24, peer.Mac);
     Put16(receive.data() + 42, static_cast<u16>(Round.ID << 4));
     Round.ReplySlotTime = (ChildSize + 32) * 4 + 102;
     Put16(receive.data() + 44, Round.ReplySlotTime);
@@ -2855,12 +3174,12 @@ void WMService::Impl::FinishRound()
             {
                 const u16 aidBit = 1u << response.AID;
                 ReadyBitmap |= aidBit;
-                if (Layout().Firmware && !(Round.Failed & aidBit))
+                if (Layout().Early && !(Round.Failed & aidBit))
                     Write16(Status + Layout().Ready, Read16(Status + Layout().Ready) | aidBit);
                 std::copy(response.Data.begin(), response.Data.end(), receive.begin() + offset + 10);
                 PortCallbacks(id, response.Header, response.Data, receiveBase, offset + 10);
             }
-            else if (response.Received && !Layout().Firmware) flushFailed |= 1u << response.AID;
+            else if (response.Received && !Layout().Early) flushFailed |= 1u << response.AID;
             offset += stride;
         }
         if (!response.IntentSent || response.CancelSent || ((Round.Expected & (1u << id)) && !response.Received)
@@ -2878,7 +3197,7 @@ void WMService::Impl::FinishRound()
         Put16(packet.data() + 68, Round.Failed);
         if (!Send(id, Message::RoundAck, packet.data(), packet.size())) Fail("round ACK enqueue");
     }
-    if (!Layout().Firmware) Write16(Status + Layout().Ready, ReadyBitmap);
+    if (!Layout().Early) Write16(Status + Layout().Ready, ReadyBitmap);
     FlushPacket(Round.Packet, flushFailed, false);
     auto result = Result(14);
     Put16(result.Data.data() + 4, 11);
@@ -2899,13 +3218,13 @@ void WMService::Impl::ReleaseRound(u64 id)
 {
     if (!Parent || !Round.Closing || Round.ID != id) return;
     const u16 retryBitmap = Round.Failed & Members;
-    const bool retry = retryBitmap && (!Layout().Firmware || (!Read16(Status + Layout().Booleans + 4)
+    const bool retry = retryBitmap && (!Layout().Early || (!Read16(Status + Layout().Booleans + 4)
         && Read16(Status + Layout().Frequency)));
     if (!retry) --RoundCount;
-    if (!Layout().Firmware && RoundLimit > 0) --RoundLimit;
+    if (!Layout().Early && RoundLimit > 0) --RoundLimit;
     NextPollBitmap = retry ? retryBitmap : 0xFFFF;
     Write16(Status + (Layout().Modern ? 0x62 : Layout().Frequency + 2), RoundCount);
-    if (!Layout().Firmware) Write16(Status + (Layout().Modern ? 0x64 : 0x38), RoundLimit);
+    if (!Layout().Early) Write16(Status + (Layout().Modern ? 0x64 : 0x38), RoundLimit);
     RXSelector ^= 1;
     Write16(Status + RXSelectorOffset(), RXSelector);
     Round = {};
@@ -2922,7 +3241,7 @@ void WMService::Impl::FinishChild(u16 failed, bool timeout, const u8* metadata)
     const bool retry = Round.Packet.ID && FlushPacket(Round.Packet, failed, timeout);
     ChildVSync = Round.VSync && !retry;
     NextPrepareTick = Console.SysTimestamp + (Layout().Modern ? u64(U16(MPParameters.data() + 16)) * 33514 / 1000 : 0);
-    if (polled || Layout().Firmware)
+    if (polled || Layout().Early)
     {
         const u16 error = !polled ? 13 : timeout ? 9 : (failed & (1u << OwnAID)) ? 15 : 0;
         auto result = Result(14, error);
@@ -2931,7 +3250,7 @@ void WMService::Impl::FinishChild(u16 failed, bool timeout, const u8* metadata)
         {
             result.AckMetadata = true;
             std::copy_n(metadata, 22, result.Data.begin() + 12);
-            if (Layout().Firmware)
+            if (Layout().Early)
             {
                 const MAC destination = ReadMAC(metadata + 4), source = ReadMAC(metadata + 10);
                 EncodeMAC(result.Data.data() + 16, destination);
@@ -2988,7 +3307,7 @@ void WMService::Impl::Network(const WMServicePacket& packet)
         if (receiverEpoch) { trace(TraceReason::OfferReceiver); return; }
         if (size != 8) { trace(TraceReason::OfferSize); return; }
         if (data[1]) { trace(TraceReason::OfferReserved); return; }
-        if (data[0] < 1 || data[0] > 4)
+        if (data[0] < 1 || data[0] > 5)
         {
             trace(TraceReason::OfferProfile);
             Fatal("unsupported peer WM owner");
@@ -3159,8 +3478,12 @@ void WMService::Impl::Network(const WMServicePacket& packet)
             Write16(Status + Layout().Members, Members);
             Write16(Status + Layout().Link, Members ? 3 : 0);
             StoreMAC(Status + Layout().ChildMACs + (aid - 1) * 6, peer.Mac);
-            if (Layout().Firmware)
-                for (unsigned offset = 0; offset < 16; offset += 2) Write16(Status + 0x1F8 + aid * 16 + offset, 1);
+            if (Layout().Early)
+            {
+                const u32 sequences = Status + Layout().MPChannels + 2 + aid * 16;
+                const unsigned bytes = Profile == 5 ? 32 : 16;
+                for (unsigned offset = 0; offset < bytes; offset += 2) Write16(sequences + offset, 1);
+            }
             if (Layout().LegacyRetail()) Write16(Status + Layout().Ready, Read16(Status + Layout().Ready) & ~(1u << aid));
             auto result = Result(8);
             Put16(result.Data.data() + 8, 7);
@@ -3231,7 +3554,7 @@ void WMService::Impl::Network(const WMServicePacket& packet)
         State(8);
         if (Profile == 3) Radio.Start(Console.SysTimestamp);
         SetSizes();
-        if (Layout().Firmware)
+        if (Layout().Early)
         {
             const u8* bss = ConnectRequest.Payload.data();
             const bool keySharing = bss[0x4B] & 4;
@@ -3348,10 +3671,18 @@ u64 WMService::Impl::ChildAckTicks() const
 bool WMService::Impl::DeferFrameWait(u64 delay)
 {
     constexpr u64 frameUS = (263 * 2130ULL * 1000000 + ARM7ClockHz - 1) / ARM7ClockHz;
-    if (!delay || delay > frameUS || FrameWait.EndWall || !CanPollHost() || Parent || !BeaconPhaseValid
-        || !Round.ID || Round.Closing || !Round.Polled || !Round.VSync || !Round.Packet.ID || InFlight || !Callbacks.empty()) return false;
+    if (!delay || delay > frameUS || FrameWait.EndWall || !CanPollHost() || Parent || !BeaconPhaseValid) return false;
     const u64 now = Now();
-    FrameWait = {now, now + delay, Console.SysTimestamp, Round.ID, ChildAckTicks()};
+    if (Round.ID)
+    {
+        if (Round.Closing || !Round.Polled || !Round.VSync || !Round.Packet.ID || InFlight || !Callbacks.empty()) return false;
+        FrameWait = {now, now + delay, Console.SysTimestamp, Round.ID, ChildAckTicks()};
+    }
+    else
+    {
+        if (!ChildVSync || Prepared.ID || !LastParentRound || Intent.State != RoundIntent::Stage::Retired || !OwnsIntent()) return false;
+        FrameWait = {now, now + delay, Console.SysTimestamp, LastParentRound, 0, LastParentRound + 1};
+    }
     return true;
 }
 
@@ -3371,8 +3702,7 @@ void WMService::Impl::PaceFrameWait(bool finish)
     u64 now = Now();
     while (now < due)
     {
-        Platform::Sleep(due - now);
-        now = Now();
+        now = SleepForWM(due - now);
     }
     if (finish || (now >= FrameWait.EndWall && !BeforePacedAck())) FrameWait = {};
 }
@@ -3436,7 +3766,7 @@ void WMService::Impl::WaitForMP(u64 vblankDeadline)
         else
         {
             const u64 sleepStart = deadline == vblankDeadline ? Now() : now;
-            if (sleepStart < deadline) Platform::Sleep(std::min<u64>(200, deadline - sleepStart));
+            if (sleepStart < deadline) SleepForWM(std::min<u64>(200, deadline - sleepStart));
         }
     }
 }
@@ -3596,6 +3926,7 @@ bool WMService::CanPollHost() const { return State->CanPollHost(); }
 bool WMService::DeferFrameWait(u64 delay) { return State->DeferFrameWait(delay); }
 void WMService::FinishFrameWait() { State->PaceFrameWait(true); }
 void WMService::SetFrameDeadline(u64 deadline) { State->FrameDeadline = deadline; }
+u64 WMService::ThreadWaitTimeUS() { return ThreadWaitUS; }
 void WMService::Capture(u32 word) { State->Capture(word); StopIfTerminal(); }
 void WMService::ClearFIFO() { State->Requests.clear(); }
 bool WMService::BlocksARM7() const { return State->BlocksARM7(); }

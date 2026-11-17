@@ -3018,7 +3018,7 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
     const u64 nivelPostEscrituraFisico = static_cast<u64>(
         std::max(0, nivelPostEscritura));
 
-    double fastHighOverlaySkew = 0.0;
+    double skewMinimoSalida = 0.0;
     const u64 ventanaLenta = 12 * (u64)objetivoControl;
 
     constexpr u64 ticksUnFrameDS = 355ULL * 263ULL * 3ULL;
@@ -3435,6 +3435,7 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
         AdaptPhaseEpisodioActivo = false;
         AdaptPhaseObjetivoFrames = 0;
         AdaptPhaseObjetivoActivo = false;
+        AdaptTempoRecuperandoExceso = false;
         AdaptPhaseRebasePendiente = false;
         AdaptPhaseRebaseBandViolada = false;
         AdaptPhaseRebaseMinFrames = -1;
@@ -3953,7 +3954,7 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
     auto publicarSalida = [&]() {
         AdaptSkew = limitar(AdaptSkew);
         const double skewSalida = limitar(std::max(
-            AdaptSkew, fastHighOverlaySkew));
+            AdaptSkew, skewMinimoSalida));
         AdaptActConsAnterior = hostConsumed;
         AdaptActTicksAnterior = ticksAlConsumo;
         AdaptActFramesAnterior = framesAlConsumo;
@@ -4862,10 +4863,13 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
     const u64 deltaFastTicks = ticksAlConsumo - AdaptFastTicksInicio;
     const bool nivelFuera = nivelPostConsumo < nivelBajo
                          || nivelPostConsumo > nivelAlto;
-    const bool ventanaFast = deltaFastCons >= ventanaRate
+    const bool tempoSinObjetivo = OutputTempo && AdaptHint == 0.0;
+    const u64 ventanaMuestreoFast = tempoSinObjetivo && !AdaptProbe
+        ? ventanaLenta : ventanaRate;
+    const bool ventanaFast = deltaFastCons >= ventanaMuestreoFast
                           && deltaFastTicks >= ticksDosFrames;
     const bool urgenciaFast = nivelPostEscritura >= nivelAlto
-                           && deltaFastCons >= (OutputTempo ? ventanaRate : 1)
+                           && deltaFastCons >= (OutputTempo ? ventanaMuestreoFast : 1)
                            && deltaFastTicks >= ticksDosFrames;
     const bool ventanaFastPublicable = deltaFastCons >= ventanaRate
                                     && deltaFastTicks
@@ -8269,6 +8273,34 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
         ? AdaptRatio
         : objetivoPhaseOrdinario;
 
+    const u64 umbralExcesoTempo = static_cast<u64>(nivelSeguro)
+        + (AdaptTempoRecuperandoExceso ? 0 : ventanaLenta);
+    const bool faseTempoDisponible = !phasePoseidaPorRate && !AdaptProbe;
+    AdaptTempoRecuperandoExceso = OutputTempo && AdaptHint > 0.0
+        && faseTempoDisponible && nivelPostConsumoLogico > umbralExcesoTempo
+        && !phaseConservadaPorRebaseHint && !AdaptRateActuadorPendiente
+        && !AdaptFastCambioTargetPhaseEscrowActivo
+        && !AdaptSostenidoPhaseProvisionalActivo;
+    if ((tempoSinObjetivo && faseTempoDisponible) || AdaptTempoRecuperandoExceso)
+    {
+        const double demanda = static_cast<double>(ventanaLenta);
+        const double nivelRecuperacion = tempoSinObjetivo ? objetivoFase : nivelSeguro;
+        const double produccion = std::clamp(
+            demanda + nivelRecuperacion - static_cast<double>(nivelPostConsumoLogico),
+            demanda * 0.5, demanda * 2.0);
+        const double skewRecuperacion = limitar(AdaptRatio * demanda / produccion);
+        if (tempoSinObjetivo)
+        {
+            objetivoSkew = skewRecuperacion;
+            AdaptSkew = objetivoSkew;
+            aplicarInmediato = true;
+        }
+        else
+        {
+            skewMinimoSalida = skewRecuperacion;
+        }
+    }
+
     if (AdaptFastCambioTargetPhaseEscrowActivo)
     {
 
@@ -8652,7 +8684,7 @@ void SPU::UpdateOutputAdaptivo(u64 hostConsumed, u64 ticksAlConsumo,
                     AdaptSostenidoFastHighEscrowGuardSkew, capSuffix)));
             if (guardiaFinita > AdaptSkew)
             {
-                fastHighOverlaySkew = guardiaFinita;
+                skewMinimoSalida = guardiaFinita;
                 ++telemetry.fastHighEscrowOverlayCount;
                 telemetry.lastFastHighEscrowOverlayUpdateId =
                     telemetry.updateId;
@@ -8786,16 +8818,18 @@ void SPU::ResetOutputAdaptivo()
     AdaptResetEpoch.fetch_add(1, std::memory_order_release);
 }
 
-void SPU::SetOutputLatencyFrames(u32 frames)
+void SPU::SetOutputLatencyFrames(u32 frames, bool lowLatency)
 {
-    if (OutputTempoRequested.load(std::memory_order_acquire))
-        frames = std::max(frames, static_cast<u32>(std::ceil(
-            OutputSampleRate * (OutputTempoState::SequenceMs
-                - OutputTempoState::OverlapMs) / 1000.0)));
-    u32 capacity = 8;
-    while (capacity < frames && capacity < (1u << 28))
-        capacity <<= 1;
-    capacity *= 4;
+    const u32 tempoBatchFrames = OutputTempoRequested.load(std::memory_order_acquire)
+        ? static_cast<u32>(std::ceil(OutputSampleRate * (OutputTempoState::SequenceMs
+            - OutputTempoState::OverlapMs) / 1000.0)) : 0;
+    const u64 minimumControlTarget = lowLatency
+        ? (static_cast<u64>(frames) + tempoBatchFrames + 2) / 3
+        : std::max(frames, tempoBatchFrames);
+    u32 controlTarget = 8;
+    while (controlTarget < minimumControlTarget && controlTarget < (1u << 28))
+        controlTarget <<= 1;
+    const u32 capacity = 4 * controlTarget;
     if (OutputControlCapacity.exchange(capacity, std::memory_order_acq_rel)
         != capacity)
         ResetOutputAdaptivo();

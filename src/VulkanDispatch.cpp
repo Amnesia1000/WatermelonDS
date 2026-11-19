@@ -10,8 +10,12 @@
 #include "Platform.h"
 
 #if MELONDS_HAS_ADRENOTOOLS
+#include <algorithm>
+#include <memory>
+#include <vector>
 #include <adrenotools/driver.h>
 #include <adrenotools/priv.h>
+#include <vulkan/vk_icd.h>
 #endif
 
 PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR = nullptr;
@@ -147,6 +151,7 @@ DriverConfiguration gConfiguration;
 void* gVulkanHandle = nullptr;
 bool gInitialized = false;
 bool gUsingCustomDriver = false;
+bool gUsingDriverSurface = false;
 
 bool sameConfiguration(const DriverConfiguration& left, const DriverConfiguration& right)
 {
@@ -160,8 +165,53 @@ bool sameConfiguration(const DriverConfiguration& left, const DriverConfiguratio
 
 void* loadSymbol(const char* name)
 {
-    return gVulkanHandle != nullptr ? dlsym(gVulkanHandle, name) : nullptr;
+    return gVulkanHandle != nullptr && !gUsingDriverSurface ? dlsym(gVulkanHandle, name) : nullptr;
 }
+
+#if MELONDS_HAS_ADRENOTOOLS
+void* openDriverWithAndroidSurface(const DriverConfiguration& config, PFN_vkGetInstanceProcAddr& entry)
+{
+    const std::string path = config.CustomDriverDir + "/" + config.CustomDriverName;
+    std::unique_ptr<void, decltype(&dlclose)> driver(dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL), &dlclose);
+    if (!driver)
+        return nullptr;
+
+    const auto get = reinterpret_cast<PFN_vkGetInstanceProcAddr>(dlsym(driver.get(), "vk_icdGetInstanceProcAddr"));
+    if (!get)
+        return nullptr;
+    auto negotiate = reinterpret_cast<PFN_vk_icdNegotiateLoaderICDInterfaceVersion>(
+        dlsym(driver.get(), "vk_icdNegotiateLoaderICDInterfaceVersion"));
+    if (!negotiate)
+        negotiate = reinterpret_cast<PFN_vk_icdNegotiateLoaderICDInterfaceVersion>(
+            get(VK_NULL_HANDLE, "vk_icdNegotiateLoaderICDInterfaceVersion"));
+    uint32_t interfaceVersion = 5;
+    if (!negotiate || negotiate(&interfaceVersion) != VK_SUCCESS || interfaceVersion != 5)
+        return nullptr;
+
+    const auto version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(get(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
+    const auto enumerate = reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(
+        get(VK_NULL_HANDLE, "vkEnumerateInstanceExtensionProperties"));
+    uint32_t apiVersion = 0;
+    uint32_t count = 0;
+    if (!version || version(&apiVersion) != VK_SUCCESS || apiVersion < VK_API_VERSION_1_1 ||
+        !get(VK_NULL_HANDLE, "vkCreateInstance") || !get(VK_NULL_HANDLE, "vkEnumerateInstanceLayerProperties") ||
+        !enumerate || enumerate(nullptr, &count, nullptr) != VK_SUCCESS || count == 0)
+        return nullptr;
+
+    std::vector<VkExtensionProperties> extensions(count);
+    if (enumerate(nullptr, &count, extensions.data()) != VK_SUCCESS)
+        return nullptr;
+    const auto supports = [&](const char* name) {
+        return std::any_of(extensions.begin(), extensions.begin() + count,
+            [name](const VkExtensionProperties& ext) { return std::strcmp(ext.extensionName, name) == 0; });
+    };
+    if (!supports(VK_KHR_SURFACE_EXTENSION_NAME) || !supports(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME))
+        return nullptr;
+
+    entry = get;
+    return driver.release();
+}
+#endif
 
 bool isNullInstanceGlobalProc(const char* name)
 {
@@ -325,6 +375,7 @@ void unloadDriver()
     gVulkanHandle = nullptr;
     gInitialized = false;
     gUsingCustomDriver = false;
+    gUsingDriverSurface = false;
     vkGetInstanceProcAddr = nullptr;
     loadGlobalSymbols();
 }
@@ -985,23 +1036,29 @@ bool Initialize()
 #if MELONDS_HAS_ADRENOTOOLS
     if (requestedCustomDriver)
     {
-        gVulkanHandle = adrenotools_open_libvulkan(
-            RTLD_NOW | RTLD_LOCAL,
-            ADRENOTOOLS_DRIVER_CUSTOM,
-            gConfiguration.TmpLibDir.empty() ? nullptr : gConfiguration.TmpLibDir.c_str(),
-            gConfiguration.HookLibDir.c_str(),
-            gConfiguration.CustomDriverDir.c_str(),
-            gConfiguration.CustomDriverName.c_str(),
-            nullptr,
-            nullptr
-        );
+        gVulkanHandle = openDriverWithAndroidSurface(gConfiguration, vkGetInstanceProcAddr);
+        gUsingDriverSurface = gVulkanHandle != nullptr;
+        if (!gUsingDriverSurface)
+        {
+            gVulkanHandle = adrenotools_open_libvulkan(
+                RTLD_NOW | RTLD_LOCAL,
+                ADRENOTOOLS_DRIVER_CUSTOM,
+                gConfiguration.TmpLibDir.empty() ? nullptr : gConfiguration.TmpLibDir.c_str(),
+                gConfiguration.HookLibDir.c_str(),
+                gConfiguration.CustomDriverDir.c_str(),
+                gConfiguration.CustomDriverName.c_str(),
+                nullptr,
+                nullptr
+            );
+        }
         if (gVulkanHandle != nullptr)
         {
             gUsingCustomDriver = true;
             Platform::Log(
                 Platform::LogLevel::Warn,
-                "VulkanDriver: source=custom driver=%s result=opened",
-                gConfiguration.DisplayName.empty() ? gConfiguration.CustomDriverName.c_str() : gConfiguration.DisplayName.c_str()
+                "VulkanDriver: source=custom driver=%s result=opened surface=%s",
+                gConfiguration.DisplayName.empty() ? gConfiguration.CustomDriverName.c_str() : gConfiguration.DisplayName.c_str(),
+                gUsingDriverSurface ? "driver" : "android"
             );
         }
         else
@@ -1088,7 +1145,8 @@ bool Initialize()
         return false;
     }
 
-    vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(loadSymbol("vkGetInstanceProcAddr"));
+    if (!gUsingDriverSurface)
+        vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(loadSymbol("vkGetInstanceProcAddr"));
     if (vkGetInstanceProcAddr == nullptr)
     {
         Platform::Log(Platform::LogLevel::Error, "VulkanDriver: vkGetInstanceProcAddr not found");

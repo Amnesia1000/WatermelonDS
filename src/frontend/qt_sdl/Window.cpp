@@ -2576,22 +2576,19 @@ void MainWindow::showLauncher()
 
 void MainWindow::showEmulator()
 {
-    if (centralWidget() == panel && panel != nullptr)
-    {
-        return;
-    }
-
-    takeCentralWidget();
     if (launcher)
     {
-        launcher->setParent(this);
+        takeCentralWidget();
         launcher->hide();
+        launcher->deleteLater();
+        launcher = nullptr;
     }
 
     if (panel)
     {
         setCentralWidget(panel);
         panel->show();
+        panel->raise();
         emit screenLayoutChange();
     }
 

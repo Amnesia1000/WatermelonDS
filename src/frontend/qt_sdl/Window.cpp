@@ -2333,7 +2333,8 @@ void MainWindow::onEmuStart()
     if (floatingBar)
     {
         floatingBar->setEmuPaused(false);
-        floatingBar->hideBar();
+        updateFloatingBarPos();
+        floatingBar->showBar();
     }
     if (hasMenu)
     {
@@ -2426,7 +2427,7 @@ void MainWindow::updateFloatingBarPos()
 {
     if (!floatingBar) return;
     floatingBar->adjustSize();
-    int x = (width() - floatingBar->width()) / 2;
+    int x = std::max(0, (width() - floatingBar->width()) / 2);
     int y = 6;
     floatingBar->move(x, y);
     floatingBar->raise();

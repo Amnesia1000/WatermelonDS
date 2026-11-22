@@ -10,11 +10,11 @@
 #include <QGraphicsDropShadowEffect>
 
 WatermelonFloatingBar::WatermelonFloatingBar(QWidget* parent)
-    : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::NoDropShadowWindowHint)
+    : QWidget(parent)
 {
     setObjectName(QStringLiteral("watermelonFloatingBar"));
+    setAttribute(Qt::WA_NativeWindow, true);
     setAutoFillBackground(true);
-    setAttribute(Qt::WA_ShowWithoutActivating, true);
     setAttribute(Qt::WA_StyledBackground, true);
     setFocusPolicy(Qt::NoFocus);
 
@@ -47,12 +47,6 @@ WatermelonFloatingBar::WatermelonFloatingBar(QWidget* parent)
         "  color: #ff5477;"
         "}"
     ));
-
-    auto* shadow = new QGraphicsDropShadowEffect(this);
-    shadow->setBlurRadius(20);
-    shadow->setColor(QColor(0, 0, 0, 160));
-    shadow->setOffset(0, 5);
-    setGraphicsEffect(shadow);
 
     auto* lay = new QHBoxLayout(this);
     lay->setContentsMargins(10, 6, 10, 6);
@@ -172,6 +166,7 @@ void WatermelonFloatingBar::paintEvent(QPaintEvent* event)
     Q_UNUSED(event);
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
+    p.fillRect(rect(), QColor(QStringLiteral("#14131b")));
     p.setBrush(QColor(QStringLiteral("#14131b")));
     p.setPen(QPen(QColor(QStringLiteral("#6fbf4a")), 1.5));
     p.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 14, 14);

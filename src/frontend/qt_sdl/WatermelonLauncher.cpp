@@ -9,7 +9,7 @@
 #include <functional>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QGridLayout>
+#include <QCoreApplication>
 #include <QScrollArea>
 #include <QLabel>
 #include <QLineEdit>
@@ -30,6 +30,9 @@
 #include <QTimer>
 #include <QMenu>
 #include <QDesktopServices>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QCryptographicHash>
 
 namespace
 {
@@ -40,15 +43,44 @@ public:
     std::function<void()> onClick;
     std::function<void(const QPoint&)> onContextMenu;
 
-    ClickableCard(const QString& filePath, QWidget* parent = nullptr)
-        : QWidget(parent), romPath(filePath)
+    ClickableCard(const WatermelonRom& rom, int cardW, int cardH, QWidget* parent = nullptr)
+        : QWidget(parent), m_rom(rom), m_cardW(cardW), m_cardH(cardH)
     {
+        setFixedSize(cardW, cardH);
+        setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         setCursor(Qt::PointingHandCursor);
         setAttribute(Qt::WA_Hover, true);
         setContextMenuPolicy(Qt::CustomContextMenu);
+
+        if (m_rom.hasCover && !m_rom.cover.isNull())
+        {
+            // Scale to fill the card completely (crop excess)
+            m_scaledCover = m_rom.cover.scaled(cardW, cardH, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+        }
+        else if (!m_rom.icon.isNull())
+        {
+            m_scaledIcon = m_rom.icon.scaled(44, 44, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        }
     }
 
+    QSize sizeHint() const override { return QSize(m_cardW, m_cardH); }
+    QSize minimumSizeHint() const override { return QSize(m_cardW, m_cardH); }
+
 protected:
+    void enterEvent(QEnterEvent* event) override
+    {
+        QWidget::enterEvent(event);
+        m_hovered = true;
+        update();
+    }
+
+    void leaveEvent(QEvent* event) override
+    {
+        QWidget::leaveEvent(event);
+        m_hovered = false;
+        update();
+    }
+
     void mousePressEvent(QMouseEvent* event) override
     {
         if (event->button() == Qt::LeftButton)
@@ -62,8 +94,117 @@ protected:
         QWidget::mousePressEvent(event);
     }
 
+    void paintEvent(QPaintEvent* event) override
+    {
+        Q_UNUSED(event);
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+        p.setRenderHint(QPainter::SmoothPixmapTransform);
+
+        const int r = 14;
+        QRect cardRect = rect();
+
+        QPainterPath clipPath;
+        clipPath.addRoundedRect(cardRect, r, r);
+        p.setClipPath(clipPath);
+
+        if (m_rom.hasCover && !m_scaledCover.isNull())
+        {
+            // Dark background behind cover for any sub-pixel edges
+            p.fillRect(cardRect, QColor(QStringLiteral("#1e1d24")));
+            // Draw cover centered and cropped to fill (no black bars)
+            int dx = (cardRect.width() - m_scaledCover.width()) / 2;
+            int dy = (cardRect.height() - m_scaledCover.height()) / 2;
+            p.drawPixmap(dx, dy, m_scaledCover);
+        }
+        else
+        {
+            // Fallback dark placeholder card
+            p.fillRect(cardRect, QColor(QStringLiteral("#1e1d24")));
+
+            // Subtle cartridge or controller icon in center
+            if (!m_scaledIcon.isNull())
+            {
+                p.drawPixmap((width() - 44) / 2, (height() / 2) - 36, m_scaledIcon);
+            }
+            else
+            {
+                p.setPen(QColor(QStringLiteral("#434253")));
+                p.setFont(QFont(QStringLiteral("sans-serif"), 24, QFont::Bold));
+                p.drawText(QRect(0, 0, width(), height() - 30), Qt::AlignCenter, QStringLiteral("🎮"));
+            }
+
+            // Bottom title overlay for missing cover
+            QRect titleBox(0, height() - 56, width(), 56);
+            QLinearGradient grad(0, titleBox.top(), 0, titleBox.bottom());
+            grad.setColorAt(0.0, QColor(14, 13, 18, 0));
+            grad.setColorAt(0.35, QColor(14, 13, 18, 205));
+            grad.setColorAt(1.0, QColor(14, 13, 18, 250));
+            p.fillRect(titleBox, grad);
+
+            p.setPen(QColor(QStringLiteral("#f6f5f3")));
+            QFont f(QStringLiteral("sans-serif"), 9, QFont::DemiBold);
+            p.setFont(f);
+            QString titleText = m_rom.title.isEmpty() ? m_rom.fileName : m_rom.title;
+            QRect textRect = titleBox.adjusted(8, 12, -8, -4);
+            p.drawText(textRect, Qt::AlignTop | Qt::AlignLeft | Qt::TextWordWrap, titleText);
+        }
+
+        // Draw top badges overlaid on the cover
+        // 1. DS / DSi badge (always visible)
+        QString badgeText = m_rom.isDSi ? QStringLiteral("DSi") : QStringLiteral("DS");
+        QFont badgeFont(QStringLiteral("sans-serif"), 8, QFont::Bold);
+        QFontMetrics fm(badgeFont);
+        int badgeW = fm.horizontalAdvance(badgeText) + 12;
+        int badgeH = 18;
+        QRect dsRect(7, 7, badgeW, badgeH);
+
+        // Semi-transparent black background with border
+        p.setPen(QPen(QColor(255, 255, 255, 80), 1));
+        p.setBrush(QColor(0, 0, 0, 160));
+        p.drawRoundedRect(dsRect, 5, 5);
+        p.setPen(QColor(255, 255, 255));
+        p.setFont(badgeFont);
+        p.drawText(dsRect, Qt::AlignCenter, badgeText);
+
+        // 2. Achievements badge (only if game has achievements)
+        if (m_rom.hasAchievements)
+        {
+            QRect raRect(dsRect.right() + 5, 7, 22, 18);
+            p.setPen(QPen(QColor(255, 255, 255, 80), 1));
+            p.setBrush(QColor(0, 0, 0, 160));
+            p.drawRoundedRect(raRect, 5, 5);
+
+            p.setPen(Qt::NoPen);
+            p.setBrush(QColor(QStringLiteral("#f5b041")));
+            QPainterPath cup;
+            cup.moveTo(raRect.x() + 6, raRect.y() + 4);
+            cup.lineTo(raRect.x() + 16, raRect.y() + 4);
+            cup.lineTo(raRect.x() + 14, raRect.y() + 9);
+            cup.quadTo(raRect.x() + 11, raRect.y() + 11, raRect.x() + 8, raRect.y() + 9);
+            cup.closeSubpath();
+            p.drawPath(cup);
+            p.fillRect(QRect(raRect.x() + 10, raRect.y() + 11, 2, 2), QColor(QStringLiteral("#f5b041")));
+            p.fillRect(QRect(raRect.x() + 8, raRect.y() + 13, 6, 2), QColor(QStringLiteral("#f5b041")));
+        }
+
+        // Draw hover border
+        if (m_hovered)
+        {
+            p.setClipping(false);
+            p.setPen(QPen(QColor(QStringLiteral("#6fbf4a")), 2.0));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(cardRect.adjusted(1, 1, -1, -1), r, r);
+        }
+    }
+
 private:
-    QString romPath;
+    WatermelonRom m_rom;
+    QPixmap m_scaledCover;
+    QPixmap m_scaledIcon;
+    int m_cardW = 169;
+    int m_cardH = 200;
+    bool m_hovered = false;
 };
 
 }
@@ -73,7 +214,8 @@ WatermelonLauncher::WatermelonLauncher(QWidget* parent)
 {
     networkManager = new QNetworkAccessManager(this);
     setupUI();
-    refresh();
+    // Defer refresh so the window can appear first
+    QTimer::singleShot(100, this, &WatermelonLauncher::refresh);
 }
 
 WatermelonLauncher::~WatermelonLauncher() = default;
@@ -174,7 +316,7 @@ void WatermelonLauncher::setupUI()
     recentScroll->setFrameShape(QFrame::NoFrame);
     recentScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     recentScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    recentScroll->setFixedHeight(246);
+    recentScroll->setFixedHeight(172);
     recentScroll->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
 
     recentShelfContainer = new QWidget(recentScroll);
@@ -200,10 +342,6 @@ void WatermelonLauncher::setupUI()
 
     gridContainer = new QWidget(gridSection);
     gridContainer->setStyleSheet(QStringLiteral("background: transparent;"));
-    gridLayout = new QGridLayout(gridContainer);
-    gridLayout->setContentsMargins(0, 0, 0, 0);
-    gridLayout->setSpacing(16);
-    gridLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     gridSectionLayout->addWidget(gridContainer);
 
     emptyLabel = new QLabel(gridSection);
@@ -231,6 +369,7 @@ void WatermelonLauncher::refresh()
     loadRecent();
     scanDirectories();
     renderGames();
+    fetchRAGamesList();
 }
 
 void WatermelonLauncher::loadRecent()
@@ -249,7 +388,7 @@ void WatermelonLauncher::loadRecent()
         rom.filePath = path;
         rom.fileName = QFileInfo(path).fileName();
         rom.isRecent = true;
-        rom.cover = extractRomInfo(path, rom.title, rom.gameCode, rom.icon);
+        rom.cover = extractRomInfo(path, rom.title, rom.gameCode, rom.icon, rom.hasCover, rom.isDSi);
         recentRoms.append(rom);
     }
 }
@@ -262,8 +401,10 @@ void WatermelonLauncher::scanDirectories()
     // 1. Add recent files first
     for (const auto& r : recentRoms)
     {
+        QString can = QFileInfo(r.filePath).canonicalFilePath();
+        if (can.isEmpty()) can = r.filePath;
+        addedPaths.insert(can);
         allRoms.append(r);
-        addedPaths.insert(r.filePath);
     }
 
     // 2. Add configured directories
@@ -286,23 +427,35 @@ void WatermelonLauncher::scanDirectories()
         if (!dir.exists()) continue;
 
         QFileInfoList files = dir.entryInfoList(filters, QDir::Files | QDir::Readable, QDir::Name);
+        int fileIdx = 0;
         for (const auto& fi : files)
         {
             QString absPath = fi.absoluteFilePath();
-            if (addedPaths.contains(absPath)) continue;
+            QString canPath = fi.canonicalFilePath();
+            if (canPath.isEmpty()) canPath = absPath;
+            if (addedPaths.contains(canPath) || addedPaths.contains(absPath)) continue;
 
             WatermelonRom rom;
             rom.filePath = absPath;
             rom.fileName = fi.fileName();
-            rom.cover = extractRomInfo(absPath, rom.title, rom.gameCode, rom.icon);
+            rom.cover = extractRomInfo(absPath, rom.title, rom.gameCode, rom.icon, rom.hasCover, rom.isDSi);
             allRoms.append(rom);
+            addedPaths.insert(canPath);
             addedPaths.insert(absPath);
+
+            // Keep UI responsive during large scans
+            if (++fileIdx % 5 == 0)
+                QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         }
     }
 }
 
 void WatermelonLauncher::renderGames()
 {
+    // Guard against re-entrant calls (resize events during widget creation)
+    static bool rendering = false;
+    if (rendering) return;
+    rendering = true;
     // Render Recent Shelf
     while (recentShelfLayout->count() > 1)
     {
@@ -325,13 +478,9 @@ void WatermelonLauncher::renderGames()
         }
     }
 
-    // Render Grid
-    while (gridLayout->count() > 0)
-    {
-        auto* item = gridLayout->takeAt(0);
-        if (item->widget()) delete item->widget();
-        delete item;
-    }
+    // Render Grid — manual positioning (no QGridLayout, avoids overlap)
+    QList<QWidget*> oldCards = gridContainer->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly);
+    qDeleteAll(oldCards);
 
     QList<WatermelonRom> filtered;
     for (const auto& rom : allRoms)
@@ -349,33 +498,32 @@ void WatermelonLauncher::renderGames()
     {
         emptyLabel->show();
         gridContainer->hide();
+        gridContainer->setFixedHeight(0);
     }
     else
     {
         emptyLabel->hide();
         gridContainer->show();
 
+        const int cardW = 169, cardH = 150, spacing = 16;
         int availableWidth = scrollArea ? scrollArea->viewport()->width() : width();
         if (availableWidth < 300) availableWidth = 900;
-        int cardWidth = 160;
-        int spacing = 16;
-        int columns = qMax(1, (availableWidth + spacing) / (cardWidth + spacing));
-
-        // Clear previous column stretches
-        for (int c = 0; c <= columns + 2; ++c)
-            gridLayout->setColumnStretch(c, 0);
+        int columns = qMax(1, (availableWidth + spacing) / (cardW + spacing));
 
         for (int i = 0; i < filtered.size(); ++i)
         {
             int row = i / columns;
             int col = i % columns;
             QWidget* card = createGameCard(filtered[i], false);
-            gridLayout->addWidget(card, row, col, Qt::AlignLeft | Qt::AlignTop);
+            card->setParent(gridContainer);
+            card->move(col * (cardW + spacing), row * (cardH + spacing));
+            card->show();
         }
 
-        // Add stretch after the last column so cards stay left-aligned and match recent cards
-        gridLayout->setColumnStretch(columns, 1);
+        int totalRows = (filtered.size() + columns - 1) / columns;
+        gridContainer->setFixedHeight(totalRows * (cardH + spacing));
     }
+    rendering = false;
 }
 
 void WatermelonLauncher::updateHeaderResponsiveness(int w)
@@ -425,63 +573,9 @@ void WatermelonLauncher::resizeEvent(QResizeEvent* event)
 
 QWidget* WatermelonLauncher::createGameCard(const WatermelonRom& rom, bool isRecentShelf)
 {
-    auto* card = new ClickableCard(rom.filePath, this);
-    const int cardWidth = 160;
-    const int cardHeight = 230;
-    card->setFixedSize(cardWidth, cardHeight);
-
-    auto* layout = new QVBoxLayout(card);
-    layout->setContentsMargins(10, 10, 10, 10);
-    layout->setSpacing(6);
-
-    card->setStyleSheet(QStringLiteral(
-        "QWidget {"
-        "   background-color: #1e1d24;"
-        "   border: 1px solid #2e2d38;"
-        "   border-radius: 14px;"
-        "}"
-        "QWidget:hover {"
-        "   background-color: #272630;"
-        "   border: 2px solid #6fbf4a;"
-        "}"
-    ));
-
-    // Cover Image with optional achievement badge overlay
-    int coverH = isRecentShelf ? 130 : 140;
-    auto* coverContainer = new QWidget(card);
-    coverContainer->setFixedSize(cardWidth - 20, coverH);
-    coverContainer->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
-
-    auto* coverLabel = new QLabel(coverContainer);
-    coverLabel->setGeometry(0, 0, cardWidth - 20, coverH);
-    coverLabel->setAlignment(Qt::AlignCenter);
-    coverLabel->setStyleSheet(QStringLiteral("background: transparent; border: none; border-radius: 8px;"));
-
-    QPixmap scaled = rom.cover.scaled(coverLabel->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    coverLabel->setPixmap(scaled);
-
-    auto* raBadge = new QLabel(QStringLiteral("🏆"), coverContainer);
-    raBadge->setToolTip(QStringLiteral("Soporte para RetroAchievements"));
-    raBadge->setStyleSheet(QStringLiteral(
-        "background: rgba(18, 17, 25, 0.85); border-radius: 9px; padding: 1px 4px; font-size: 11px; border: 1px solid rgba(255,255,255,0.12);"
-    ));
-    raBadge->adjustSize();
-    raBadge->move(coverContainer->width() - raBadge->width() - 4, 4);
-    raBadge->raise();
-
-    layout->addWidget(coverContainer);
-
-    // Title (takes all remaining space for large titles without cutting off)
-    auto* titleLabel = new QLabel(card);
-    QString fullTitle = rom.title.isEmpty() ? rom.fileName : rom.title;
-    titleLabel->setText(fullTitle);
-    titleLabel->setStyleSheet(QStringLiteral(
-        "color: #f6f5f3; font-weight: 600; font-size: 11.5px; background: transparent; border: none;"
-    ));
-    titleLabel->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-    titleLabel->setWordWrap(true);
-    titleLabel->setToolTip(fullTitle);
-    layout->addWidget(titleLabel, 1);
+    const int cardWidth = 169;
+    const int cardHeight = 150;
+    auto* card = new ClickableCard(rom, cardWidth, cardHeight, this);
 
     card->onClick = [this, rom]() {
         WatermelonGameDialog::applyGameConfig(rom.gameCode);
@@ -576,8 +670,11 @@ void WatermelonLauncher::openGameDialog(const WatermelonRom& rom, int initialTab
     dlg.exec();
 }
 
-QPixmap WatermelonLauncher::extractRomInfo(const QString& path, QString& outTitle, QString& outCode, QPixmap& outIcon)
+QPixmap WatermelonLauncher::extractRomInfo(const QString& path, QString& outTitle, QString& outCode, QPixmap& outIcon, bool& outHasCover, bool& outIsDSi)
 {
+    outHasCover = false;
+    outIsDSi = false;
+
     QFileInfo fi(path);
     QString rawBaseName = fi.completeBaseName();
     QString cleanBaseName = rawBaseName.trimmed();
@@ -611,6 +708,13 @@ QPixmap WatermelonLauncher::extractRomInfo(const QString& path, QString& outTitl
         char codeBuf[5] = {0};
         memcpy(codeBuf, header + 12, 4);
         outCode = QString::fromLatin1(codeBuf).trimmed();
+
+        // Detect DSi: unitcode byte at offset 0x12, bit 1 set means DSi
+        if (readBytes > 0x12)
+        {
+            uint8_t unitCode = static_cast<uint8_t>(header[0x12]);
+            outIsDSi = (unitCode & 0x02) != 0;
+        }
 
         bannerOffset = qFromLittleEndian<quint32>(reinterpret_cast<const uchar*>(header + 0x68));
     }
@@ -728,7 +832,7 @@ QPixmap WatermelonLauncher::extractRomInfo(const QString& path, QString& outTitl
         if (QFile::exists(cPath))
         {
             QPixmap cached(cPath);
-            if (!cached.isNull()) return cached;
+            if (!cached.isNull()) { outHasCover = true; return cached; }
         }
     }
 
@@ -909,6 +1013,7 @@ void WatermelonLauncher::onCoverDownloaded(const QString& key, const QPixmap& pi
         if (r.gameCode == key || r.title == key)
         {
             r.cover = pixmap;
+            r.hasCover = true;
             updated = true;
         }
     }
@@ -917,6 +1022,7 @@ void WatermelonLauncher::onCoverDownloaded(const QString& key, const QPixmap& pi
         if (r.gameCode == key || r.title == key)
         {
             r.cover = pixmap;
+            r.hasCover = true;
             updated = true;
         }
     }
@@ -987,4 +1093,305 @@ void WatermelonLauncher::onSettingsClicked()
     WatermelonSettingsDialog dlg(this);
     connect(&dlg, &WatermelonSettingsDialog::settingsSaved, this, &WatermelonLauncher::refresh);
     dlg.exec();
+}
+
+
+// Compute RetroAchievements-compatible hash for NDS ROMs
+// Algorithm (from rcheevos): MD5( header[0x160] + ARM9_binary + ARM7_binary + icon_title[0xA00] )
+// Matches the official rcheevos rc_hash_nintendo_ds implementation
+QString WatermelonLauncher::computeRAHash(const QString& romPath)
+{
+    QFile file(romPath);
+    if (!file.open(QIODevice::ReadOnly)) return QString();
+
+    qint64 romSize = file.size();
+    if (romSize < 0x200) { file.close(); return QString(); }
+
+    QByteArray header = file.read(0x200);
+    if (header.size() < 0x200) { file.close(); return QString(); }
+
+    // Check for SuperCard header (0x2E 0x00 0x00 0xEA at start, plus DF 96 at 0xB0-0xB3)
+    qint64 baseOffset = 0;
+    const auto* hdr = reinterpret_cast<const uint8_t*>(header.constData());
+    if (hdr[0] == 0x2E && hdr[1] == 0x00 && hdr[2] == 0x00 && hdr[3] == 0xEA &&
+        hdr[0xB0] == 0x44 && hdr[0xB1] == 0x46 && hdr[0xB2] == 0x96 && hdr[0xB3] == 0x00)
+    {
+        // SuperCard header detected, skip it
+        baseOffset = 512;
+        file.seek(baseOffset);
+        header = file.read(0x200);
+        if (header.size() < 0x200) { file.close(); return QString(); }
+    }
+
+    auto readU32 = [&](int offset) -> quint32 {
+        return qFromLittleEndian<quint32>(reinterpret_cast<const uchar*>(header.constData() + offset));
+    };
+
+    quint32 arm9Offset = readU32(0x20);
+    quint32 arm9Size   = readU32(0x2C);
+    quint32 arm7Offset = readU32(0x30);
+    quint32 arm7Size   = readU32(0x3C);
+    quint32 iconOffset = readU32(0x68);
+
+    // Sanity check: code blocks should be less than 16MB total
+    if ((quint64)arm9Size + arm7Size > 16 * 1024 * 1024) { file.close(); return QString(); }
+
+    QCryptographicHash md5(QCryptographicHash::Md5);
+
+    const int CHUNK = 65536;
+
+    auto hashSection = [&](quint64 offset, quint32 size) {
+        if (size == 0) return;
+        if ((qint64)(offset + size) > romSize) return;
+        file.seek(offset);
+        quint32 remaining = size;
+        while (remaining > 0)
+        {
+            int toRead = qMin((quint32)CHUNK, remaining);
+            QByteArray chunk = file.read(toRead);
+            if (chunk.isEmpty()) break;
+            md5.addData(chunk);
+            remaining -= chunk.size();
+        }
+    };
+
+    // rcheevos order: header(0x160) → ARM9 → ARM7 → icon/title(0xA00)
+    md5.addData(QByteArrayView(header.constData(), 0x160));
+    hashSection(arm9Offset + baseOffset, arm9Size);
+    hashSection(arm7Offset + baseOffset, arm7Size);
+
+    // Icon/title: read 0xA00 bytes, zero-pad if short (homebrew)
+    if (iconOffset > 0 && (qint64)(iconOffset + baseOffset) < romSize)
+    {
+        file.seek(iconOffset + baseOffset);
+        QByteArray iconData = file.read(0xA00);
+        if (iconData.size() < 0xA00)
+            iconData.append(QByteArray(0xA00 - iconData.size(), '\0'));
+        md5.addData(iconData);
+    }
+
+    file.close();
+    return QString::fromLatin1(md5.result().toHex());
+}
+
+// Fetch RA hash library in bulk and check hashes against it
+void WatermelonLauncher::fetchRAGamesList()
+{
+    if (raChecksRunning) return;
+    raChecksRunning = true;
+
+    // Load cached results from disk
+    QString cacheFile = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
+                        + QStringLiteral("/melonDS/ra_hash_cache.json");
+    if (raHashCache.isEmpty())
+    {
+        QFile f(cacheFile);
+        if (f.open(QIODevice::ReadOnly))
+        {
+            QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+            f.close();
+            QJsonObject obj = doc.object();
+            for (auto it = obj.begin(); it != obj.end(); ++it)
+                raHashCache.insert(it.key(), it.value().toBool());
+        }
+    }
+
+    int totalRoms = allRoms.size();
+    if (totalRoms == 0)
+    {
+        raChecksRunning = false;
+        return;
+    }
+
+    // Compute hashes for all ROMs first (staggered to avoid UI blocking)
+    for (int i = 0; i < totalRoms; ++i)
+    {
+        QTimer::singleShot(i * 50, this, [this, i]() {
+            if (i >= allRoms.size()) return;
+            WatermelonRom* rom = &allRoms[i];
+            if (rom->filePath.isEmpty()) return;
+            if (rom->raHash.isEmpty())
+                rom->raHash = computeRAHash(rom->filePath);
+        });
+    }
+
+    // After all hashes are computed, fetch the bulk hash library from RA
+    QTimer::singleShot(totalRoms * 50 + 100, this, [this]() {
+        // Apply cached results immediately
+        bool anyApplied = false;
+        for (auto& r : allRoms)
+        {
+            if (!r.raHash.isEmpty() && raHashCache.contains(r.raHash))
+            {
+                bool has = raHashCache.value(r.raHash);
+                if (has != r.hasAchievements) { r.hasAchievements = has; anyApplied = true; }
+            }
+        }
+        for (auto& r : recentRoms)
+        {
+            if (!r.raHash.isEmpty() && raHashCache.contains(r.raHash))
+            {
+                bool has = raHashCache.value(r.raHash);
+                if (has != r.hasAchievements) { r.hasAchievements = has; anyApplied = true; }
+            }
+            else
+            {
+                // Sync raHash from allRoms
+                for (const auto& a : allRoms)
+                {
+                    if (a.filePath == r.filePath && !a.raHash.isEmpty())
+                    {
+                        r.raHash = a.raHash;
+                        if (raHashCache.contains(a.raHash))
+                        {
+                            bool has = raHashCache.value(a.raHash);
+                            if (has != r.hasAchievements) { r.hasAchievements = has; anyApplied = true; }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        if (anyApplied) renderGames();
+
+        // Check if all hashes are already cached
+        bool allCached = true;
+        for (const auto& r : allRoms)
+        {
+            if (!r.raHash.isEmpty() && !raHashCache.contains(r.raHash))
+            { allCached = false; break; }
+        }
+        if (allCached) { raChecksRunning = false; return; }
+
+        // Fetch the full NDS hash library in one request (console ID 18 = NDS)
+        QUrl url(QStringLiteral("https://retroachievements.org/dorequest.php?r=hashlibrary&c=18"));
+        QNetworkRequest req(url);
+        req.setHeader(QNetworkRequest::UserAgentHeader, QByteArrayLiteral("melonDualDS-android/0.7.0"));
+        req.setTransferTimeout(15000);
+
+        auto* reply = networkManager->get(req);
+        connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+            reply->deleteLater();
+            raChecksRunning = false;
+
+            if (reply->error() != QNetworkReply::NoError) return;
+
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            if (!doc.isObject()) return;
+
+            QJsonObject root = doc.object();
+            QJsonObject md5List = root.value(QStringLiteral("MD5List")).toObject();
+            if (md5List.isEmpty()) return;
+
+            // Build a set of all known RA hashes
+            QSet<QString> raHashSet;
+            for (auto it = md5List.begin(); it != md5List.end(); ++it)
+                raHashSet.insert(it.key());
+
+            // Check each ROM by direct hash match only
+            bool changed = false;
+            for (auto& r : allRoms)
+            {
+                if (r.raHash.isEmpty()) continue;
+                bool has = raHashSet.contains(r.raHash);
+                raHashCache.insert(r.raHash, has);
+                if (has != r.hasAchievements) { r.hasAchievements = has; changed = true; }
+            }
+            for (auto& r : recentRoms)
+            {
+                if (r.raHash.isEmpty()) continue;
+                bool has = raHashSet.contains(r.raHash);
+                raHashCache.insert(r.raHash, has);
+                if (has != r.hasAchievements) { r.hasAchievements = has; changed = true; }
+            }
+
+            saveRACache();
+            if (changed) renderGames();
+        });
+    });
+}
+
+void WatermelonLauncher::checkRAHashForRom(const QString& hash)
+{
+    QString key = QStringLiteral("ra_") + hash;
+    if (pendingDownloads.contains(key)) return;
+    pendingDownloads.insert(key);
+
+    QUrl url(QStringLiteral("https://retroachievements.org/dorequest.php?r=gameid&m=%1").arg(hash));
+    QNetworkRequest req(url);
+    req.setHeader(QNetworkRequest::UserAgentHeader, QByteArrayLiteral("melonDualDS-android/0.7.0"));
+    req.setTransferTimeout(8000);
+
+    auto* reply = networkManager->get(req);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, hash]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) return;
+
+        QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+        if (!doc.isObject()) return;
+
+        QJsonObject root = doc.object();
+        bool success = root.value(QStringLiteral("Success")).toBool();
+        QJsonValue gameIdVal = root.value(QStringLiteral("GameID"));
+        int gameId = 0;
+        if (gameIdVal.isDouble())
+            gameId = gameIdVal.toInt(0);
+        else if (gameIdVal.isString())
+            gameId = gameIdVal.toString().toInt();
+
+        bool hasAch = success && gameId > 0;
+        raHashCache.insert(hash, hasAch);
+        saveRACache();
+        applyRAData();
+    });
+}
+
+void WatermelonLauncher::saveRACache()
+{
+    QString cacheFile = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation)
+                        + QStringLiteral("/melonDS/ra_hash_cache.json");
+    QJsonObject cacheObj;
+    for (auto it = raHashCache.begin(); it != raHashCache.end(); ++it)
+        cacheObj.insert(it.key(), it.value());
+    QFile f(cacheFile);
+    if (f.open(QIODevice::WriteOnly))
+    {
+        f.write(QJsonDocument(cacheObj).toJson(QJsonDocument::Compact));
+        f.close();
+    }
+}
+
+void WatermelonLauncher::applyRAData()
+{
+    bool changed = false;
+    for (auto& r : allRoms)
+    {
+        if (!r.raHash.isEmpty() && raHashCache.contains(r.raHash))
+        {
+            bool has = raHashCache.value(r.raHash);
+            if (has != r.hasAchievements) { r.hasAchievements = has; changed = true; }
+        }
+    }
+    for (auto& r : recentRoms)
+    {
+        if (!r.raHash.isEmpty() && raHashCache.contains(r.raHash))
+        {
+            bool has = raHashCache.value(r.raHash);
+            if (has != r.hasAchievements) { r.hasAchievements = has; changed = true; }
+        }
+        else
+        {
+            for (const auto& a : allRoms)
+            {
+                if (a.filePath == r.filePath && !a.raHash.isEmpty())
+                {
+                    r.raHash = a.raHash;
+                    r.hasAchievements = a.hasAchievements;
+                    if (a.hasAchievements) changed = true;
+                    break;
+                }
+            }
+        }
+    }
+    if (changed) renderGames();
 }

@@ -10,7 +10,6 @@
 #include <QTimer>
 
 class QLineEdit;
-class QGridLayout;
 class QVBoxLayout;
 class QHBoxLayout;
 class QScrollArea;
@@ -23,9 +22,13 @@ struct WatermelonRom
     QString fileName;
     QString title;
     QString gameCode;
+    QString raHash;
     QPixmap cover;
     QPixmap icon;
     bool isRecent = false;
+    bool hasCover = false;
+    bool isDSi = false;
+    bool hasAchievements = false;
 };
 
 class WatermelonLauncher : public QWidget
@@ -60,11 +63,16 @@ private:
     QWidget* createGameCard(const WatermelonRom& rom, bool isRecentShelf = false);
     void showContextMenu(const WatermelonRom& rom, const QPoint& globalPos);
     void openGameDialog(const WatermelonRom& rom, int initialTab = 0);
-    QPixmap extractRomInfo(const QString& path, QString& outTitle, QString& outCode, QPixmap& outIcon);
+    QPixmap extractRomInfo(const QString& path, QString& outTitle, QString& outCode, QPixmap& outIcon, bool& outHasCover, bool& outIsDSi);
     QPixmap generateDefaultCover(const QString& title, const QString& gameCode, const QPixmap& iconPix);
     void fetchCoverArt(const QString& title, const QString& gameCode, const QString& rawBaseName);
     void tryDownloadCandidate(const QString& key, const QStringList& urls, int index);
     void updateHeaderResponsiveness(int width);
+    void fetchRAGamesList();
+    void applyRAData();
+    void saveRACache();
+    QString computeRAHash(const QString& romPath);
+    void checkRAHashForRom(const QString& hash);
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -85,7 +93,6 @@ private:
     QWidget* recentShelfSection = nullptr;
 
     QWidget* gridContainer = nullptr;
-    QGridLayout* gridLayout = nullptr;
     QLabel* emptyLabel = nullptr;
 
     QList<WatermelonRom> allRoms;
@@ -95,4 +102,7 @@ private:
     QNetworkAccessManager* networkManager = nullptr;
     QSet<QString> pendingDownloads;
     QTimer* renderDebounceTimer = nullptr;
+    int lastColumns = -1;
+    QMap<QString, bool> raHashCache;  // raHash -> hasAchievements
+    bool raChecksRunning = false;
 };

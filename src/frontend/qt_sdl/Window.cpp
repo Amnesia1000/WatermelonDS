@@ -2426,7 +2426,7 @@ void MainWindow::updateFloatingBarPos()
 {
     if (!floatingBar) return;
     floatingBar->adjustSize();
-    QPoint globalPos = mapToGlobal(QPoint((width() - floatingBar->width()) / 2, 14));
+    QPoint globalPos = mapToGlobal(QPoint((width() - floatingBar->width()) / 2, 4));
     floatingBar->move(globalPos);
     floatingBar->raise();
 }

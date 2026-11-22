@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+env:
+  MELONDS_GIT_BRANCH: ${{ github.ref_name }}
+  MELONDS_GIT_HASH: ${{ github.sha }}
+  MELONDS_BUILD_PROVIDER: GitHub Actions
+
 jobs:
   build-linux:
     name: Build Linux

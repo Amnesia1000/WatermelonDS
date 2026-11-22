@@ -740,7 +740,28 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
     show();
 
     panel = nullptr;
+    launcher = nullptr;
+    floatingBar = nullptr;
     createScreenPanel();
+
+    if (windowID == 0)
+    {
+        launcher = new WatermelonLauncher(this);
+        launcher->setGeometry(rect());
+        connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
+            preloadROMs({path}, {}, true);
+        });
+        connect(launcher, &WatermelonLauncher::openFileRequested, this, &MainWindow::onOpenFile);
+
+        if (!emuThread || !emuThread->emuIsActive())
+        {
+            showLauncher();
+        }
+        else
+        {
+            showEmulator();
+        }
+    }
 
     if (hasMenu)
     {
@@ -892,26 +913,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::createScreenPanel()
 {
-    if (windowID == 0)
-    {
-        if (!centralStack)
-        {
-            centralStack = new QStackedWidget(this);
-            launcher = new WatermelonLauncher(centralStack);
-            centralStack->addWidget(launcher);
-            setCentralWidget(centralStack);
-
-            connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
-                preloadROMs({path}, {}, true);
-            });
-            connect(launcher, &WatermelonLauncher::openFileRequested, this, &MainWindow::onOpenFile);
-        }
-        else if (panel)
-        {
-            centralStack->removeWidget(panel);
-        }
-    }
-
     if (panel) delete panel;
     panel = nullptr;
 
@@ -954,18 +955,7 @@ void MainWindow::createScreenPanel()
         panel->show();
     }
 
-    if (windowID == 0 && centralStack)
-    {
-        centralStack->addWidget(panel);
-        if (emuThread && emuThread->emuIsActive())
-            centralStack->setCurrentWidget(panel);
-        else
-            centralStack->setCurrentWidget(launcher);
-    }
-    else
-    {
-        setCentralWidget(panel);
-    }
+    setCentralWidget(panel);
 
     if (hasMenu)
         actScreenFiltering->setEnabled(hasOGL);
@@ -973,8 +963,9 @@ void MainWindow::createScreenPanel()
 
     connect(emuThread, SIGNAL(windowUpdate()), panel, SLOT(repaint()));
     connect(panel, &ScreenPanel::mouseMoved, this, &MainWindow::onScreenMouseMoved);
+    panel->installEventFilter(this);
 
-    if (!floatingBar)
+    if (!floatingBar && windowID == 0)
     {
         floatingBar = new WatermelonFloatingBar(this);
         connect(floatingBar, &WatermelonFloatingBar::pauseRequested, this, &MainWindow::onPause);
@@ -1196,6 +1187,8 @@ bool MainWindow::preloadROMs(QStringList file, QStringList gbafile, bool boot)
 
     if (file.isEmpty() && gbafile.isEmpty())
         return false;
+
+    showEmulator();
 
     if (!verifySetup())
     {
@@ -2129,8 +2122,11 @@ void MainWindow::onUpdateInterfaceSettings()
     emuInstance->targetFPS = globalCfg.GetDouble("TargetFPS");
     emuInstance->fastForwardFPS = globalCfg.GetDouble("FastForwardFPS");
     emuInstance->slowmoFPS = globalCfg.GetDouble("SlowmoFPS");
-    panel->setMouseHide(globalCfg.GetBool("Mouse.Hide"),
-                        globalCfg.GetInt("Mouse.HideSeconds")*1000);
+    if (panel)
+    {
+        panel->setMouseHide(globalCfg.GetBool("Mouse.Hide"),
+                            globalCfg.GetInt("Mouse.HideSeconds")*1000);
+    }
 }
 
 void MainWindow::onInterfaceSettingsFinished(int res)
@@ -2342,7 +2338,7 @@ void MainWindow::onEmuStart()
     }
     if (hasMenu)
     {
-        menuBar()->setFixedHeight(0);
+        menuBar()->hide();
     }
     if (!hasMenu) return;
 
@@ -2406,12 +2402,21 @@ void MainWindow::onEmuReset()
     actUndoStateLoad->setEnabled(false);
 }
 
+void MainWindow::onAutoScreenSizingChanged(int sizing)
+{
+    if (panel)
+    {
+        // forward to panel slot
+        QMetaObject::invokeMethod(panel, "onAutoScreenSizingChanged", Q_ARG(int, sizing));
+    }
+}
+
 void MainWindow::onScreenMouseMoved(const QPoint& pos)
 {
     if (!emuThread || !emuThread->emuIsActive()) return;
-    if (centralStack && centralStack->currentWidget() != panel) return;
+    if (centralWidget() != panel) return;
 
-    if (pos.y() <= 60 && floatingBar)
+    if (pos.y() <= 80 && floatingBar)
     {
         updateFloatingBarPos();
         floatingBar->pingHover();
@@ -2422,18 +2427,58 @@ void MainWindow::updateFloatingBarPos()
 {
     if (!floatingBar) return;
     floatingBar->adjustSize();
-    int x = (width() - floatingBar->width()) / 2;
-    floatingBar->move(x, 14);
+    QPoint globalPos = mapToGlobal(QPoint((width() - floatingBar->width()) / 2, 14));
+    floatingBar->move(globalPos);
     floatingBar->raise();
 }
 
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
+    if (launcher && launcher->isVisible())
+    {
+        launcher->setGeometry(rect());
+    }
     if (floatingBar && floatingBar->isVisible())
     {
         updateFloatingBarPos();
     }
+}
+
+void MainWindow::moveEvent(QMoveEvent* event)
+{
+    QMainWindow::moveEvent(event);
+    if (floatingBar && floatingBar->isVisible())
+    {
+        updateFloatingBarPos();
+    }
+}
+
+void MainWindow::changeEvent(QEvent* event)
+{
+    QMainWindow::changeEvent(event);
+    if (event->type() == QEvent::WindowStateChange)
+    {
+        if (isMinimized() && floatingBar)
+            floatingBar->hideBar();
+    }
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+    if (watched == panel && emuThread && emuThread->emuIsActive())
+    {
+        if (event->type() == QEvent::MouseMove)
+        {
+            auto* me = static_cast<QMouseEvent*>(event);
+            if (me->position().y() <= 80 && floatingBar)
+            {
+                updateFloatingBarPos();
+                floatingBar->pingHover();
+            }
+        }
+    }
+    return QMainWindow::eventFilter(watched, event);
 }
 
 void MainWindow::onUpdateVideoSettings(bool glchange)
@@ -2500,17 +2545,31 @@ void MainWindow::onUpdateVideoSettings(bool glchange)
 
 void MainWindow::showLauncher()
 {
-    if (centralStack && launcher)
+    if (floatingBar) floatingBar->hideBar();
+
+    if (launcher)
     {
-        centralStack->setCurrentWidget(launcher);
+        launcher->setGeometry(rect());
+        launcher->show();
+        launcher->raise();
         launcher->refresh();
+    }
+
+    if (hasMenu)
+    {
+        menuBar()->hide();
     }
 }
 
 void MainWindow::showEmulator()
 {
-    if (centralStack && panel)
+    if (launcher)
     {
-        centralStack->setCurrentWidget(panel);
+        launcher->hide();
+    }
+
+    if (hasMenu)
+    {
+        menuBar()->hide();
     }
 }

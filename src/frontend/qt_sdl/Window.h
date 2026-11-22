@@ -153,6 +153,9 @@ public:
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
+    void moveEvent(QMoveEvent* event) override;
+    void changeEvent(QEvent* event) override;
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
 
@@ -244,6 +247,7 @@ private slots:
     void onEmuStop();
     void onEmuPause(bool pause);
     void onEmuReset();
+    void onAutoScreenSizingChanged(int sizing);
     void onScreenMouseMoved(const QPoint& pos);
     void updateFloatingBarPos();
 
@@ -366,7 +370,6 @@ public:
 
     QAction* actAbout;
 
-    QStackedWidget* centralStack = nullptr;
     WatermelonLauncher* launcher = nullptr;
     WatermelonFloatingBar* floatingBar = nullptr;
     QAction* actShowLauncher = nullptr;

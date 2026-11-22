@@ -9,9 +9,11 @@
 #include <QGraphicsDropShadowEffect>
 
 WatermelonFloatingBar::WatermelonFloatingBar(QWidget* parent)
-    : QWidget(parent)
+    : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::NoDropShadowWindowHint)
 {
     setObjectName(QStringLiteral("watermelonFloatingBar"));
+    setAttribute(Qt::WA_TranslucentBackground, true);
+    setAttribute(Qt::WA_ShowWithoutActivating, true);
     setAttribute(Qt::WA_StyledBackground, true);
     setFocusPolicy(Qt::NoFocus);
 
@@ -143,14 +145,9 @@ void WatermelonFloatingBar::setEmuPaused(bool paused)
 
 void WatermelonFloatingBar::showBar()
 {
-    if (parentWidget()) {
-        adjustSize();
-        int x = (parentWidget()->width() - width()) / 2;
-        move(x, 14);
-        raise();
-    }
     show();
-    hideTimer->start(2200);
+    raise();
+    hideTimer->start(2500);
 }
 
 void WatermelonFloatingBar::hideBar()

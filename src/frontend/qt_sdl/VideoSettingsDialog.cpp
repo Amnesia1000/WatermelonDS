@@ -71,6 +71,12 @@ VideoSettingsDialog::VideoSettingsDialog(QWidget* parent) : QDialog(parent), ui(
     grp3DRenderer->addButton(ui->rb3DSoftware, renderer3D_Software);
     grp3DRenderer->addButton(ui->rb3DOpenGL,   renderer3D_OpenGL);
     grp3DRenderer->addButton(ui->rb3DCompute,  renderer3D_OpenGLCompute);
+
+    auto* rb3DVulkan = new QRadioButton(QStringLiteral("Vulkan (WatermelonDS)"), this);
+    auto* rbLayout = qobject_cast<QGridLayout*>(ui->rb3DCompute->parentWidget()->layout());
+    if (rbLayout)
+        rbLayout->addWidget(rb3DVulkan, 4, 0);
+    grp3DRenderer->addButton(rb3DVulkan, renderer3D_Vulkan);
 #if QT_VERSION < QT_VERSION_CHECK(5, 15, 0)
     connect(grp3DRenderer, SIGNAL(buttonClicked(int)), this, SLOT(onChange3DRenderer(int)));
 #else

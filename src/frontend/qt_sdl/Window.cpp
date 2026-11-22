@@ -81,6 +81,11 @@
 #include "CameraManager.h"
 #include "Window.h"
 #include "AboutDialog.h"
+#include "WatermelonLauncher.h"
+#include "WatermelonShaderDialog.h"
+#include "WatermelonRADialog.h"
+#include "WatermelonSettingsDialog.h"
+#include "WatermelonFloatingBar.h"
 
 using namespace melonDS;
 
@@ -283,6 +288,10 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
             actOpenROM = menu->addAction("Open ROM...");
             connect(actOpenROM, &QAction::triggered, this, &MainWindow::onOpenFile);
             actOpenROM->setShortcut(QKeySequence(QKeySequence::StandardKey::Open));
+
+            actShowLauncher = menu->addAction("Game Launcher");
+            actShowLauncher->setShortcut(QKeySequence(Qt::Key_F4));
+            connect(actShowLauncher, &QAction::triggered, this, &MainWindow::showLauncher);
 
             /*actOpenROMArchive = menu->addAction("Open ROM inside archive...");
             connect(actOpenROMArchive, &QAction::triggered, this, &MainWindow::onOpenFileArchive);
@@ -616,6 +625,11 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
         {
             QMenu * menu = menubar->addMenu("Config");
 
+            actUnifiedSettings = menu->addAction("⚙ Configuración de WatermelonDS...");
+            actUnifiedSettings->setShortcut(QKeySequence(Qt::Key_F12));
+            connect(actUnifiedSettings, &QAction::triggered, this, &MainWindow::onOpenUnifiedSettings);
+            menu->addSeparator();
+
             actEmuSettings = menu->addAction("Emu settings");
             connect(actEmuSettings, &QAction::triggered, this, &MainWindow::onOpenEmuSettings);
 
@@ -662,6 +676,20 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
 
             menu->addSeparator();
 
+            actRetroArchShaders = menu->addAction("RetroArch Shaders...");
+            connect(actRetroArchShaders, &QAction::triggered, this, [this]() {
+                WatermelonShaderDialog dlg(this);
+                dlg.exec();
+            });
+
+            actRetroAchievements = menu->addAction("RetroAchievements...");
+            connect(actRetroAchievements, &QAction::triggered, this, [this]() {
+                WatermelonRADialog dlg(this);
+                dlg.exec();
+            });
+
+            menu->addSeparator();
+
             actLimitFramerate = menu->addAction("Limit framerate");
             actLimitFramerate->setCheckable(true);
             connect(actLimitFramerate, &QAction::triggered, this, &MainWindow::onChangeLimitFramerate);
@@ -681,6 +709,7 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
         }
 
         setMenuBar(menubar);
+        menubar->setFixedHeight(0);
 
         if (localCfg.GetString("Firmware.Username") == "Arisotura")
             actMPNewInstance->setText("Fart");
@@ -703,6 +732,11 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
         // if the window was closed in fullscreen do not restore this
         setWindowState(windowState() & ~Qt::WindowFullScreen);
     }
+    else
+    {
+        resize(1024, 720);
+    }
+    setMinimumSize(740, 480);
     show();
 
     panel = nullptr;
@@ -858,6 +892,26 @@ void MainWindow::closeEvent(QCloseEvent* event)
 
 void MainWindow::createScreenPanel()
 {
+    if (windowID == 0)
+    {
+        if (!centralStack)
+        {
+            centralStack = new QStackedWidget(this);
+            launcher = new WatermelonLauncher(centralStack);
+            centralStack->addWidget(launcher);
+            setCentralWidget(centralStack);
+
+            connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
+                preloadROMs({path}, {}, true);
+            });
+            connect(launcher, &WatermelonLauncher::openFileRequested, this, &MainWindow::onOpenFile);
+        }
+        else if (panel)
+        {
+            centralStack->removeWidget(panel);
+        }
+    }
+
     if (panel) delete panel;
     panel = nullptr;
 
@@ -899,13 +953,37 @@ void MainWindow::createScreenPanel()
         panel = panelNative;
         panel->show();
     }
-    setCentralWidget(panel);
+
+    if (windowID == 0 && centralStack)
+    {
+        centralStack->addWidget(panel);
+        if (emuThread && emuThread->emuIsActive())
+            centralStack->setCurrentWidget(panel);
+        else
+            centralStack->setCurrentWidget(launcher);
+    }
+    else
+    {
+        setCentralWidget(panel);
+    }
 
     if (hasMenu)
         actScreenFiltering->setEnabled(hasOGL);
     panel->osdSetEnabled(showOSD);
 
     connect(emuThread, SIGNAL(windowUpdate()), panel, SLOT(repaint()));
+    connect(panel, &ScreenPanel::mouseMoved, this, &MainWindow::onScreenMouseMoved);
+
+    if (!floatingBar)
+    {
+        floatingBar = new WatermelonFloatingBar(this);
+        connect(floatingBar, &WatermelonFloatingBar::pauseRequested, this, &MainWindow::onPause);
+        connect(floatingBar, &WatermelonFloatingBar::frameStepRequested, this, &MainWindow::onFrameStep);
+        connect(floatingBar, &WatermelonFloatingBar::resetRequested, this, &MainWindow::onReset);
+        connect(floatingBar, &WatermelonFloatingBar::stopRequested, this, &MainWindow::onStop);
+        connect(floatingBar, &WatermelonFloatingBar::settingsRequested, this, &MainWindow::onOpenUnifiedSettings);
+        connect(floatingBar, &WatermelonFloatingBar::fullscreenRequested, this, &MainWindow::toggleFullscreen);
+    }
 
     connect(this, SIGNAL(screenLayoutChange()), panel, SLOT(onScreenLayoutChanged()));
     emit screenLayoutChange();
@@ -1885,6 +1963,17 @@ void MainWindow::onEmuSettingsDialogFinished(int res)
     emuThread->emuUnpause();
 }
 
+void MainWindow::onOpenUnifiedSettings()
+{
+    emuThread->emuPause();
+    WatermelonSettingsDialog dlg(this);
+    connect(&dlg, &WatermelonSettingsDialog::settingsSaved, this, [this]() {
+        if (launcher) launcher->refresh();
+    });
+    dlg.exec();
+    emuThread->emuUnpause();
+}
+
 void MainWindow::onOpenInputConfig()
 {
     emuThread->emuPause();
@@ -2245,6 +2334,16 @@ void MainWindow::onScreenEmphasisToggled()
 
 void MainWindow::onEmuStart()
 {
+    showEmulator();
+    if (floatingBar)
+    {
+        floatingBar->setEmuPaused(false);
+        floatingBar->hideBar();
+    }
+    if (hasMenu)
+    {
+        menuBar()->setFixedHeight(0);
+    }
     if (!hasMenu) return;
 
     for (int i = 1; i < 9; i++)
@@ -2270,6 +2369,8 @@ void MainWindow::onEmuStart()
 
 void MainWindow::onEmuStop()
 {
+    if (floatingBar) floatingBar->hideBar();
+    showLauncher();
     if (!hasMenu) return;
 
     for (int i = 0; i < 9; i++)
@@ -2292,6 +2393,7 @@ void MainWindow::onEmuStop()
 
 void MainWindow::onEmuPause(bool pause)
 {
+    if (floatingBar) floatingBar->setEmuPaused(pause);
     if (!hasMenu) return;
 
     actPause->setChecked(pause);
@@ -2302,6 +2404,36 @@ void MainWindow::onEmuReset()
     if (!hasMenu) return;
 
     actUndoStateLoad->setEnabled(false);
+}
+
+void MainWindow::onScreenMouseMoved(const QPoint& pos)
+{
+    if (!emuThread || !emuThread->emuIsActive()) return;
+    if (centralStack && centralStack->currentWidget() != panel) return;
+
+    if (pos.y() <= 60 && floatingBar)
+    {
+        updateFloatingBarPos();
+        floatingBar->pingHover();
+    }
+}
+
+void MainWindow::updateFloatingBarPos()
+{
+    if (!floatingBar) return;
+    floatingBar->adjustSize();
+    int x = (width() - floatingBar->width()) / 2;
+    floatingBar->move(x, 14);
+    floatingBar->raise();
+}
+
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+    if (floatingBar && floatingBar->isVisible())
+    {
+        updateFloatingBarPos();
+    }
 }
 
 void MainWindow::onUpdateVideoSettings(bool glchange)
@@ -2363,5 +2495,22 @@ void MainWindow::onUpdateVideoSettings(bool glchange)
     if (glchange)
     {
         emuThread->emuUnpause();
+    }
+}
+
+void MainWindow::showLauncher()
+{
+    if (centralStack && launcher)
+    {
+        centralStack->setCurrentWidget(launcher);
+        launcher->refresh();
+    }
+}
+
+void MainWindow::showEmulator()
+{
+    if (centralStack && panel)
+    {
+        centralStack->setCurrentWidget(panel);
     }
 }

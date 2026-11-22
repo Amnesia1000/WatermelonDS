@@ -3,9 +3,35 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
-#include <dlfcn.h>
 #include <mutex>
 #include <utility>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#define RTLD_NOW 0
+#define RTLD_LOCAL 0
+static inline void* win_dlopen(const char* filename, int) {
+    return (void*)LoadLibraryA(filename);
+}
+static inline void* win_dlsym(void* handle, const char* name) {
+    return (void*)GetProcAddress((HMODULE)handle, name);
+}
+static inline int win_dlclose(void* handle) {
+    return FreeLibrary((HMODULE)handle) ? 0 : -1;
+}
+static inline const char* win_dlerror() {
+    return "Windows LoadLibrary/GetProcAddress error";
+}
+#define dlopen win_dlopen
+#define dlsym win_dlsym
+#define dlclose win_dlclose
+#define dlerror win_dlerror
+#else
+#include <dlfcn.h>
+#endif
 
 #include "Platform.h"
 
@@ -53,7 +79,9 @@ PFN_vkCmdSetStencilReference vkCmdSetStencilReference = nullptr;
 PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask = nullptr;
 PFN_vkCmdSetViewport vkCmdSetViewport = nullptr;
 PFN_vkCmdWriteTimestamp vkCmdWriteTimestamp = nullptr;
+#ifdef __ANDROID__
 PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR = nullptr;
+#endif
 PFN_vkCreateBuffer vkCreateBuffer = nullptr;
 PFN_vkCreateCommandPool vkCreateCommandPool = nullptr;
 PFN_vkCreateComputePipelines vkCreateComputePipelines = nullptr;
@@ -105,7 +133,9 @@ PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices = nullptr;
 PFN_vkFreeCommandBuffers vkFreeCommandBuffers = nullptr;
 PFN_vkFreeDescriptorSets vkFreeDescriptorSets = nullptr;
 PFN_vkFreeMemory vkFreeMemory = nullptr;
+#ifdef __ANDROID__
 PFN_vkGetAndroidHardwareBufferPropertiesANDROID vkGetAndroidHardwareBufferPropertiesANDROID = nullptr;
+#endif
 PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements = nullptr;
 PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr = nullptr;
 PFN_vkGetDeviceQueue vkGetDeviceQueue = nullptr;
@@ -279,7 +309,9 @@ void loadGlobalSymbols()
     loadGlobal(vkCmdSetStencilWriteMask, "vkCmdSetStencilWriteMask");
     loadGlobal(vkCmdSetViewport, "vkCmdSetViewport");
     loadGlobal(vkCmdWriteTimestamp, "vkCmdWriteTimestamp");
+#ifdef __ANDROID__
     loadGlobal(vkCreateAndroidSurfaceKHR, "vkCreateAndroidSurfaceKHR");
+#endif
     loadGlobal(vkCreateBuffer, "vkCreateBuffer");
     loadGlobal(vkCreateCommandPool, "vkCreateCommandPool");
     loadGlobal(vkCreateComputePipelines, "vkCreateComputePipelines");
@@ -331,7 +363,9 @@ void loadGlobalSymbols()
     loadGlobal(vkFreeCommandBuffers, "vkFreeCommandBuffers");
     loadGlobal(vkFreeDescriptorSets, "vkFreeDescriptorSets");
     loadGlobal(vkFreeMemory, "vkFreeMemory");
+#ifdef __ANDROID__
     loadGlobal(vkGetAndroidHardwareBufferPropertiesANDROID, "vkGetAndroidHardwareBufferPropertiesANDROID");
+#endif
     loadGlobal(vkGetBufferMemoryRequirements, "vkGetBufferMemoryRequirements");
     loadGlobal(vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
     loadGlobal(vkGetDeviceQueue, "vkGetDeviceQueue");
@@ -417,7 +451,9 @@ void loadInstanceSymbols(VkInstance instance)
     loadInstance(instance, vkCmdSetStencilWriteMask, "vkCmdSetStencilWriteMask");
     loadInstance(instance, vkCmdSetViewport, "vkCmdSetViewport");
     loadInstance(instance, vkCmdWriteTimestamp, "vkCmdWriteTimestamp");
+#ifdef __ANDROID__
     loadInstance(instance, vkCreateAndroidSurfaceKHR, "vkCreateAndroidSurfaceKHR");
+#endif
     loadInstance(instance, vkCreateBuffer, "vkCreateBuffer");
     loadInstance(instance, vkCreateCommandPool, "vkCreateCommandPool");
     loadInstance(instance, vkCreateComputePipelines, "vkCreateComputePipelines");
@@ -469,7 +505,9 @@ void loadInstanceSymbols(VkInstance instance)
     loadInstance(instance, vkFreeCommandBuffers, "vkFreeCommandBuffers");
     loadInstance(instance, vkFreeDescriptorSets, "vkFreeDescriptorSets");
     loadInstance(instance, vkFreeMemory, "vkFreeMemory");
+#ifdef __ANDROID__
     loadInstance(instance, vkGetAndroidHardwareBufferPropertiesANDROID, "vkGetAndroidHardwareBufferPropertiesANDROID");
+#endif
     loadInstance(instance, vkGetBufferMemoryRequirements, "vkGetBufferMemoryRequirements");
     loadInstance(instance, vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
     loadInstance(instance, vkGetDeviceQueue, "vkGetDeviceQueue");
@@ -889,11 +927,13 @@ void loadDeviceSymbols(VkDevice device)
         if (resolved != nullptr)
             vkFreeMemory = resolved;
     }
+#ifdef __ANDROID__
     if (vkGetDeviceProcAddr != nullptr) {
         auto resolved = reinterpret_cast<PFN_vkGetAndroidHardwareBufferPropertiesANDROID>(vkGetDeviceProcAddr(device, "vkGetAndroidHardwareBufferPropertiesANDROID"));
         if (resolved != nullptr)
             vkGetAndroidHardwareBufferPropertiesANDROID = resolved;
     }
+#endif
     if (vkGetDeviceProcAddr != nullptr) {
         auto resolved = reinterpret_cast<PFN_vkGetBufferMemoryRequirements>(vkGetDeviceProcAddr(device, "vkGetBufferMemoryRequirements"));
         if (resolved != nullptr)
@@ -1104,13 +1144,18 @@ bool Initialize()
             systemDriverLibrary = configuredLibrary;
         }
 
-#if defined(__APPLE__)
+#if defined(_WIN32)
+        constexpr std::array<const char*, 1> defaultSystemLibraries = {
+            "vulkan-1.dll",
+        };
+#elif defined(__APPLE__)
         constexpr std::array<const char*, 2> defaultSystemLibraries = {
             "libvulkan.dylib",
             "libMoltenVK.dylib",
         };
 #else
-        constexpr std::array<const char*, 1> defaultSystemLibraries = {
+        constexpr std::array<const char*, 2> defaultSystemLibraries = {
+            "libvulkan.so.1",
             "libvulkan.so",
         };
 #endif

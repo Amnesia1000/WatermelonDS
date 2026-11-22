@@ -32,6 +32,10 @@
 #include <QMutex>
 #include <QScreen>
 #include <QCloseEvent>
+#include <QStackedWidget>
+
+class WatermelonLauncher;
+class WatermelonFloatingBar;
 
 #include "Screen.h"
 #include "Config.h"
@@ -138,6 +142,9 @@ public:
 
     void osdAddMessage(unsigned int color, const char* msg);
 
+    void showLauncher();
+    void showEmulator();
+
     // called when the MP interface is changed
     void updateMPInterface(melonDS::MPInterfaceType type);
 
@@ -145,6 +152,7 @@ public:
     //void updateVideoSettings(bool glchange);
 
 protected:
+    void resizeEvent(QResizeEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void keyReleaseEvent(QKeyEvent* event) override;
 
@@ -192,6 +200,7 @@ private slots:
     void onNPStartClient();
     void onNPTest();
 
+    void onOpenUnifiedSettings();
     void onOpenEmuSettings();
     void onEmuSettingsDialogFinished(int res);
     void onOpenInputConfig();
@@ -235,6 +244,8 @@ private slots:
     void onEmuStop();
     void onEmuPause(bool pause);
     void onEmuReset();
+    void onScreenMouseMoved(const QPoint& pos);
+    void updateFloatingBarPos();
 
     void onUpdateVideoSettings(bool glchange);
 
@@ -317,6 +328,7 @@ public:
     QAction* actNPStartClient;
     QAction* actNPTest;
 
+    QAction* actUnifiedSettings;
     QAction* actEmuSettings;
 #ifdef __APPLE__
     QAction* actPreferences;
@@ -353,6 +365,13 @@ public:
     QAction* actAudioSync;
 
     QAction* actAbout;
+
+    QStackedWidget* centralStack = nullptr;
+    WatermelonLauncher* launcher = nullptr;
+    WatermelonFloatingBar* floatingBar = nullptr;
+    QAction* actShowLauncher = nullptr;
+    QAction* actRetroArchShaders = nullptr;
+    QAction* actRetroAchievements = nullptr;
 };
 
 #endif // WINDOW_H

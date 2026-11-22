@@ -48,6 +48,7 @@
 #include "RTC.h"
 #include "DSi.h"
 #include "DSi_I2C.h"
+#include "GPU3D_Vulkan.h"
 #include "GPU3D_Soft.h"
 #include "GPU3D_OpenGL.h"
 #include "GPU3D_Compute.h"
@@ -878,6 +879,9 @@ void EmuThread::updateRenderer()
             case renderer3D_OpenGLCompute:
                 emuInstance->nds->GPU.SetRenderer3D(ComputeRenderer::New());
                 break;
+            case renderer3D_Vulkan:
+                emuInstance->nds->GPU.SetRenderer3D(melonDS::VulkanRenderer3D::New());
+                break;
             default: __builtin_unreachable();
         }
     }
@@ -900,6 +904,8 @@ void EmuThread::updateRenderer()
             static_cast<ComputeRenderer&>(emuInstance->nds->GPU.GetRenderer3D()).SetRenderSettings(
                     cfg.GetInt("3D.GL.ScaleFactor"),
                     cfg.GetBool("3D.GL.HiresCoordinates"));
+            break;
+        case renderer3D_Vulkan:
             break;
         default: __builtin_unreachable();
     }

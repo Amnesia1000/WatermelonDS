@@ -1,0 +1,203 @@
+#include "WatermelonFloatingBar.h"
+
+#include <QHBoxLayout>
+#include <QLabel>
+#include <QPushButton>
+#include <QTimer>
+#include <QFrame>
+#include <QIcon>
+#include <QGraphicsDropShadowEffect>
+
+WatermelonFloatingBar::WatermelonFloatingBar(QWidget* parent)
+    : QWidget(parent)
+{
+    setObjectName(QStringLiteral("watermelonFloatingBar"));
+    setAttribute(Qt::WA_StyledBackground, true);
+    setFocusPolicy(Qt::NoFocus);
+
+    setStyleSheet(QStringLiteral(
+        "QWidget#watermelonFloatingBar {"
+        "  background-color: rgba(20, 19, 27, 0.95);"
+        "  border: 1px solid rgba(111, 191, 74, 0.45);"
+        "  border-radius: 18px;"
+        "}"
+        "QPushButton {"
+        "  background-color: rgba(30, 29, 39, 0.85);"
+        "  color: #f6f5f3;"
+        "  border: 1px solid #333242;"
+        "  border-radius: 10px;"
+        "  padding: 5px 11px;"
+        "  font-size: 12px;"
+        "  font-weight: 600;"
+        "}"
+        "QPushButton:hover {"
+        "  background-color: #2b2a3a;"
+        "  border-color: #6fbf4a;"
+        "  color: #6fbf4a;"
+        "}"
+        "QPushButton:pressed {"
+        "  background-color: #15141c;"
+        "}"
+        "QPushButton#btnStop:hover {"
+        "  background-color: rgba(255, 84, 119, 0.2);"
+        "  border-color: #ff5477;"
+        "  color: #ff5477;"
+        "}"
+    ));
+
+    auto* shadow = new QGraphicsDropShadowEffect(this);
+    shadow->setBlurRadius(20);
+    shadow->setColor(QColor(0, 0, 0, 160));
+    shadow->setOffset(0, 5);
+    setGraphicsEffect(shadow);
+
+    auto* lay = new QHBoxLayout(this);
+    lay->setContentsMargins(10, 6, 10, 6);
+    lay->setSpacing(8);
+
+    lblStatus = new QLabel(QStringLiteral("🟢 <b style='color:#6fbf4a;'>JUGANDO</b>"), this);
+    lblStatus->setStyleSheet(QStringLiteral("font-size: 11px; padding: 0 4px; background: transparent;"));
+    lay->addWidget(lblStatus);
+
+    auto* sep1 = new QFrame(this);
+    sep1->setFrameShape(QFrame::VLine);
+    sep1->setStyleSheet(QStringLiteral("color: #333242;"));
+    lay->addWidget(sep1);
+
+    btnPause = new QPushButton(this);
+    btnPause->setIcon(QIcon(QStringLiteral(":/pause-icon")));
+    btnPause->setIconSize(QSize(13, 13));
+    btnPause->setText(QStringLiteral("  Pausar"));
+    btnPause->setToolTip(QStringLiteral("Pausar o reanudar emulación"));
+    btnPause->setCursor(Qt::PointingHandCursor);
+    connect(btnPause, &QPushButton::clicked, this, &WatermelonFloatingBar::onPauseClicked);
+    lay->addWidget(btnPause);
+
+    btnFrameStep = new QPushButton(this);
+    btnFrameStep->setIcon(QIcon(QStringLiteral(":/step-icon")));
+    btnFrameStep->setIconSize(QSize(13, 13));
+    btnFrameStep->setText(QStringLiteral("  Paso"));
+    btnFrameStep->setToolTip(QStringLiteral("Avanzar un frame (Frame Step)"));
+    btnFrameStep->setCursor(Qt::PointingHandCursor);
+    connect(btnFrameStep, &QPushButton::clicked, this, &WatermelonFloatingBar::onFrameStepClicked);
+    lay->addWidget(btnFrameStep);
+
+    btnReset = new QPushButton(this);
+    btnReset->setIcon(QIcon(QStringLiteral(":/refresh-icon")));
+    btnReset->setIconSize(QSize(13, 13));
+    btnReset->setText(QStringLiteral("  Reiniciar"));
+    btnReset->setToolTip(QStringLiteral("Reiniciar juego"));
+    btnReset->setCursor(Qt::PointingHandCursor);
+    connect(btnReset, &QPushButton::clicked, this, &WatermelonFloatingBar::onResetClicked);
+    lay->addWidget(btnReset);
+
+    btnStop = new QPushButton(this);
+    btnStop->setObjectName(QStringLiteral("btnStop"));
+    btnStop->setIcon(QIcon(QStringLiteral(":/stop-icon")));
+    btnStop->setIconSize(QSize(12, 12));
+    btnStop->setText(QStringLiteral("  Detener"));
+    btnStop->setToolTip(QStringLiteral("Detener emulación y volver al menú"));
+    btnStop->setCursor(Qt::PointingHandCursor);
+    connect(btnStop, &QPushButton::clicked, this, &WatermelonFloatingBar::onStopClicked);
+    lay->addWidget(btnStop);
+
+    auto* sep2 = new QFrame(this);
+    sep2->setFrameShape(QFrame::VLine);
+    sep2->setStyleSheet(QStringLiteral("color: #333242;"));
+    lay->addWidget(sep2);
+
+    btnSettings = new QPushButton(QStringLiteral("⚙ Ajustes"), this);
+    btnSettings->setToolTip(QStringLiteral("Configuración"));
+    btnSettings->setCursor(Qt::PointingHandCursor);
+    connect(btnSettings, &QPushButton::clicked, this, &WatermelonFloatingBar::settingsRequested);
+    lay->addWidget(btnSettings);
+
+    btnFullscreen = new QPushButton(QStringLiteral("⛶"), this);
+    btnFullscreen->setToolTip(QStringLiteral("Pantalla completa"));
+    btnFullscreen->setFixedWidth(30);
+    btnFullscreen->setCursor(Qt::PointingHandCursor);
+    connect(btnFullscreen, &QPushButton::clicked, this, &WatermelonFloatingBar::fullscreenRequested);
+    lay->addWidget(btnFullscreen);
+
+    adjustSize();
+    hide();
+
+    hideTimer = new QTimer(this);
+    hideTimer->setSingleShot(true);
+    connect(hideTimer, &QTimer::timeout, this, &WatermelonFloatingBar::hideBar);
+}
+
+void WatermelonFloatingBar::setEmuPaused(bool paused)
+{
+    isPaused = paused;
+    if (isPaused) {
+        lblStatus->setText(QStringLiteral("⏸ <b style='color:#f1c40f;'>PAUSADO</b>"));
+        btnPause->setIcon(QIcon(QStringLiteral(":/play-icon")));
+        btnPause->setText(QStringLiteral("  Continuar"));
+    } else {
+        lblStatus->setText(QStringLiteral("🟢 <b style='color:#6fbf4a;'>JUGANDO</b>"));
+        btnPause->setIcon(QIcon(QStringLiteral(":/pause-icon")));
+        btnPause->setText(QStringLiteral("  Pausar"));
+    }
+}
+
+void WatermelonFloatingBar::showBar()
+{
+    if (parentWidget()) {
+        adjustSize();
+        int x = (parentWidget()->width() - width()) / 2;
+        move(x, 14);
+        raise();
+    }
+    show();
+    hideTimer->start(2200);
+}
+
+void WatermelonFloatingBar::hideBar()
+{
+    hide();
+}
+
+void WatermelonFloatingBar::pingHover()
+{
+    if (!isVisible()) {
+        showBar();
+    } else {
+        hideTimer->start(2200);
+    }
+}
+
+void WatermelonFloatingBar::enterEvent(QEnterEvent* event)
+{
+    QWidget::enterEvent(event);
+    hideTimer->stop();
+}
+
+void WatermelonFloatingBar::leaveEvent(QEvent* event)
+{
+    QWidget::leaveEvent(event);
+    hideTimer->start(1800);
+}
+
+void WatermelonFloatingBar::onPauseClicked()
+{
+    emit pauseRequested(!isPaused);
+    pingHover();
+}
+
+void WatermelonFloatingBar::onFrameStepClicked()
+{
+    emit frameStepRequested();
+    pingHover();
+}
+
+void WatermelonFloatingBar::onResetClicked()
+{
+    emit resetRequested();
+    pingHover();
+}
+
+void WatermelonFloatingBar::onStopClicked()
+{
+    emit stopRequested();
+}

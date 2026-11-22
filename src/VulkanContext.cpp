@@ -17,10 +17,16 @@ namespace melonDS
 {
 namespace
 {
+#ifdef __ANDROID__
 constexpr std::array<const char*, 2> kRequiredInstanceExtensions = {
     VK_KHR_SURFACE_EXTENSION_NAME,
     VK_KHR_ANDROID_SURFACE_EXTENSION_NAME,
 };
+#else
+constexpr std::array<const char*, 1> kRequiredInstanceExtensions = {
+    VK_KHR_SURFACE_EXTENSION_NAME,
+};
+#endif
 
 constexpr std::array<const char*, 1> kRequiredDeviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -30,7 +36,9 @@ constexpr const char* kTimelineSemaphoreExtension = VK_KHR_TIMELINE_SEMAPHORE_EX
 constexpr const char* kPortabilitySubsetExtension = "VK_KHR_portability_subset";
 constexpr const char* kOptionalHostQueryResetExtension = VK_EXT_HOST_QUERY_RESET_EXTENSION_NAME;
 constexpr const char* kOptionalExternalMemoryExtension = VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME;
+#ifdef __ANDROID__
 constexpr const char* kOptionalAndroidHardwareBufferExtension = VK_ANDROID_EXTERNAL_MEMORY_ANDROID_HARDWARE_BUFFER_EXTENSION_NAME;
+#endif
 constexpr const char* kOptionalDebugUtilsExtension = VK_EXT_DEBUG_UTILS_EXTENSION_NAME;
 constexpr const char* kValidationLayerName = "VK_LAYER_KHRONOS_validation";
 std::atomic<bool> gForceDisableTimelineSemaphores{false};
@@ -372,9 +380,10 @@ bool VulkanContext::initializeLocked()
             enabledDeviceExtensions.push_back(VK_GOOGLE_DISPLAY_TIMING_EXTENSION_NAME);
         if (hasExtension(kPortabilitySubsetExtension, deviceExtensions))
             enabledDeviceExtensions.push_back(kPortabilitySubsetExtension);
+        bool enableAhbInterop = false;
+#ifdef __ANDROID__
         const bool hasExternalMemoryExtension = hasExtension(kOptionalExternalMemoryExtension, deviceExtensions);
         const bool hasAndroidHardwareBufferExtension = hasExtension(kOptionalAndroidHardwareBufferExtension, deviceExtensions);
-        bool enableAhbInterop = false;
         if (hasExternalMemoryExtension && hasAndroidHardwareBufferExtension)
         {
             enabledDeviceExtensions.push_back(kOptionalExternalMemoryExtension);
@@ -400,6 +409,7 @@ bool VulkanContext::initializeLocked()
                 kOptionalAndroidHardwareBufferExtension
             );
         }
+#endif
         const bool hasHostQueryReset = hasExtension(kOptionalHostQueryResetExtension, deviceExtensions);
         if (hasHostQueryReset)
             enabledDeviceExtensions.push_back(kOptionalHostQueryResetExtension);
@@ -629,6 +639,7 @@ bool VulkanContext::initializeLocked()
         return false;
     }
 
+#ifdef __ANDROID__
     AhbProperties = reinterpret_cast<PFN_vkGetAndroidHardwareBufferPropertiesANDROID>(
         vkGetDeviceProcAddr(Device, "vkGetAndroidHardwareBufferPropertiesANDROID")
     );
@@ -639,6 +650,7 @@ bool VulkanContext::initializeLocked()
             "VulkanContext: optional proc vkGetAndroidHardwareBufferPropertiesANDROID unavailable; continuing without AndroidHardwareBuffer interop"
         );
     }
+#endif
 
     WaitSemaphores = reinterpret_cast<PFN_vkWaitSemaphoresKHR>(
         vkGetDeviceProcAddr(Device, "vkWaitSemaphoresKHR")
@@ -701,7 +713,9 @@ void VulkanContext::shutdownLocked()
     Device = VK_NULL_HANDLE;
     Queue = VK_NULL_HANDLE;
     QueueFamilyIndex = 0;
+#ifdef __ANDROID__
     AhbProperties = nullptr;
+#endif
     WaitSemaphores = nullptr;
     GetSemaphoreCounterValueFn = nullptr;
     ResetQueryPool = nullptr;

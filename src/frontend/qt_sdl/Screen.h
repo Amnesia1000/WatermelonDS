@@ -70,6 +70,9 @@ public:
     void osdSetEnabled(bool enabled);
     void osdAddMessage(unsigned int color, const char* msg);
 
+signals:
+    void mouseMoved(const QPoint& pos);
+
 private slots:
     void onScreenLayoutChanged();
     void onAutoScreenSizingChanged(int sizing);

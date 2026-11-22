@@ -64,6 +64,7 @@
 
 #include "Net_PCap.h"
 #include "Net_Slirp.h"
+#include "WatermelonTheme.h"
 
 using namespace melonDS;
 
@@ -289,6 +290,7 @@ int main(int argc, char** argv)
         printf("did you just call me a derp???\n");
 
     MelonApplication melon(argc, argv);
+    WatermelonTheme::apply(&melon);
     pathInit();
 
     CLI::CommandLineOptions* options = CLI::ManageArgs(melon);

@@ -4,7 +4,9 @@
 #include <mutex>
 #include <string>
 #include <vulkan/vulkan.h>
+#ifdef __ANDROID__
 #include <vulkan/vulkan_android.h>
+#endif
 
 #include "types.h"
 
@@ -49,7 +51,9 @@ public:
     float GetTimestampPeriod() const { return TimestampPeriod; }
     const VulkanDeviceProfile& GetDeviceProfile() const { return DeviceProfile; }
 
+#ifdef __ANDROID__
     PFN_vkGetAndroidHardwareBufferPropertiesANDROID GetAhbProperties() const { return AhbProperties; }
+#endif
     PFN_vkWaitSemaphoresKHR GetWaitSemaphores() const { return WaitSemaphores; }
     PFN_vkGetSemaphoreCounterValueKHR GetSemaphoreCounterValue() const { return GetSemaphoreCounterValueFn; }
     PFN_vkResetQueryPoolEXT GetResetQueryPool() const { return ResetQueryPool; }
@@ -85,7 +89,9 @@ private:
     u32 QueueFamilyIndex = 0;
     std::mutex QueueLock;
 
+#ifdef __ANDROID__
     PFN_vkGetAndroidHardwareBufferPropertiesANDROID AhbProperties = nullptr;
+#endif
     PFN_vkWaitSemaphoresKHR WaitSemaphores = nullptr;
     PFN_vkGetSemaphoreCounterValueKHR GetSemaphoreCounterValueFn = nullptr;
     PFN_vkResetQueryPoolEXT ResetQueryPool = nullptr;

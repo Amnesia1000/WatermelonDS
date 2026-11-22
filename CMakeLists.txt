@@ -105,6 +105,9 @@ endif()
 
 option(BUILD_QT_SDL "Build Qt/SDL frontend" ON)
 
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/enet/CMakeLists.txt")
+    add_subdirectory(enet)
+endif()
 add_subdirectory(src)
 
 if (BUILD_QT_SDL)

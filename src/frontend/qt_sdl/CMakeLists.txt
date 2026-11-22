@@ -59,6 +59,21 @@ set(SOURCES_QT_SDL
 
     LANDialog.cpp
     NetplayDialog.cpp
+
+    WatermelonTheme.h
+    WatermelonTheme.cpp
+    WatermelonLauncher.h
+    WatermelonLauncher.cpp
+    WatermelonShaderDialog.h
+    WatermelonShaderDialog.cpp
+    WatermelonRADialog.h
+    WatermelonRADialog.cpp
+    WatermelonGameDialog.h
+    WatermelonGameDialog.cpp
+    WatermelonSettingsDialog.h
+    WatermelonSettingsDialog.cpp
+    WatermelonFloatingBar.h
+    WatermelonFloatingBar.cpp
 )
 
 option(USE_QT6 "Use Qt 6 instead of Qt 5" ON)
@@ -96,7 +111,7 @@ add_executable(melonDS ${SOURCES_QT_SDL})
 add_subdirectory("../../net"
     ${CMAKE_BINARY_DIR}/net)
 
-target_link_libraries(melonDS PRIVATE net-utils)
+target_link_libraries(melonDS PRIVATE net-utils enet)
 
 if (WIN32)
     target_link_libraries(melonDS PUBLIC opengl32)

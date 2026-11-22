@@ -74,6 +74,7 @@ enum
     renderer3D_OpenGL,
     renderer3D_OpenGLCompute,
 #endif
+    renderer3D_Vulkan,
     renderer3D_Max,
 };
 

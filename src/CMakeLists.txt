@@ -2,7 +2,10 @@ set (CMAKE_CXX_STANDARD 17)
 
 include(FixInterfaceIncludes)
 
+add_compile_definitions(VK_NO_PROTOTYPES)
+
 add_library(core STATIC
+    MelonDSAndroidStubs.cpp
     ARCodeFile.cpp
     ARDatabaseDAT.cpp
     AREngine.cpp

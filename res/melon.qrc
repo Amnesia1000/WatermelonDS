@@ -3,5 +3,15 @@
 	<qresource>
 		<file alias="melon-icon">icon/melon_256x256.png</file>
 		<file alias="melon-logo">melon384.png</file>
+		<file alias="check-icon">check.png</file>
+		<file alias="arrow-down">arrow_down.svg</file>
+		<file alias="arrow-up">arrow_up.svg</file>
+		<file alias="arrow-down-small">arrow_down_small.svg</file>
+		<file alias="refresh-icon">refresh.svg</file>
+		<file alias="pause-icon">pause.svg</file>
+		<file alias="play-icon">play.svg</file>
+		<file alias="stop-icon">stop.svg</file>
+		<file alias="step-icon">step.svg</file>
+		<file alias="cheat-icon">cheat.svg</file>
 	</qresource>
 </RCC>

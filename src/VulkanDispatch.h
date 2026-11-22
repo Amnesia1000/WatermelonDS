@@ -2,8 +2,14 @@
 
 #include <string>
 
+#ifndef VK_NO_PROTOTYPES
+#define VK_NO_PROTOTYPES
+#endif
+
 #include <vulkan/vulkan.h>
+#ifdef __ANDROID__
 #include <vulkan/vulkan_android.h>
+#endif
 
 namespace melonDS::VulkanDispatch
 {
@@ -60,7 +66,9 @@ extern PFN_vkCmdSetStencilReference vkCmdSetStencilReference;
 extern PFN_vkCmdSetStencilWriteMask vkCmdSetStencilWriteMask;
 extern PFN_vkCmdSetViewport vkCmdSetViewport;
 extern PFN_vkCmdWriteTimestamp vkCmdWriteTimestamp;
+#ifdef __ANDROID__
 extern PFN_vkCreateAndroidSurfaceKHR vkCreateAndroidSurfaceKHR;
+#endif
 extern PFN_vkCreateBuffer vkCreateBuffer;
 extern PFN_vkCreateCommandPool vkCreateCommandPool;
 extern PFN_vkCreateComputePipelines vkCreateComputePipelines;
@@ -112,7 +120,9 @@ extern PFN_vkEnumeratePhysicalDevices vkEnumeratePhysicalDevices;
 extern PFN_vkFreeCommandBuffers vkFreeCommandBuffers;
 extern PFN_vkFreeDescriptorSets vkFreeDescriptorSets;
 extern PFN_vkFreeMemory vkFreeMemory;
+#ifdef __ANDROID__
 extern PFN_vkGetAndroidHardwareBufferPropertiesANDROID vkGetAndroidHardwareBufferPropertiesANDROID;
+#endif
 extern PFN_vkGetBufferMemoryRequirements vkGetBufferMemoryRequirements;
 extern PFN_vkGetDeviceProcAddr vkGetDeviceProcAddr;
 extern PFN_vkGetDeviceQueue vkGetDeviceQueue;

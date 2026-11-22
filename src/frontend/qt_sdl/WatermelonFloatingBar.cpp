@@ -6,13 +6,14 @@
 #include <QTimer>
 #include <QFrame>
 #include <QIcon>
+#include <QPainter>
 #include <QGraphicsDropShadowEffect>
 
 WatermelonFloatingBar::WatermelonFloatingBar(QWidget* parent)
     : QWidget(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowStaysOnTopHint | Qt::NoDropShadowWindowHint)
 {
     setObjectName(QStringLiteral("watermelonFloatingBar"));
-    setAttribute(Qt::WA_TranslucentBackground, true);
+    setAutoFillBackground(true);
     setAttribute(Qt::WA_ShowWithoutActivating, true);
     setAttribute(Qt::WA_StyledBackground, true);
     setFocusPolicy(Qt::NoFocus);
@@ -114,9 +115,11 @@ WatermelonFloatingBar::WatermelonFloatingBar(QWidget* parent)
     connect(btnSettings, &QPushButton::clicked, this, &WatermelonFloatingBar::settingsRequested);
     lay->addWidget(btnSettings);
 
-    btnFullscreen = new QPushButton(QStringLiteral("⛶"), this);
+    btnFullscreen = new QPushButton(this);
+    btnFullscreen->setIcon(QIcon(QStringLiteral(":/fullscreen-icon")));
+    btnFullscreen->setIconSize(QSize(13, 13));
+    btnFullscreen->setText(QStringLiteral("  Pantalla"));
     btnFullscreen->setToolTip(QStringLiteral("Pantalla completa"));
-    btnFullscreen->setFixedWidth(30);
     btnFullscreen->setCursor(Qt::PointingHandCursor);
     connect(btnFullscreen, &QPushButton::clicked, this, &WatermelonFloatingBar::fullscreenRequested);
     lay->addWidget(btnFullscreen);
@@ -162,6 +165,16 @@ void WatermelonFloatingBar::pingHover()
     } else {
         hideTimer->start(2200);
     }
+}
+
+void WatermelonFloatingBar::paintEvent(QPaintEvent* event)
+{
+    Q_UNUSED(event);
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    p.setBrush(QColor(QStringLiteral("#14131b")));
+    p.setPen(QPen(QColor(QStringLiteral("#6fbf4a")), 1.5));
+    p.drawRoundedRect(rect().adjusted(1, 1, -1, -1), 14, 14);
 }
 
 void WatermelonFloatingBar::enterEvent(QEnterEvent* event)

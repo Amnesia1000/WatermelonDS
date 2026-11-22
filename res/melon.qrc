@@ -13,5 +13,6 @@
 		<file alias="stop-icon">stop.svg</file>
 		<file alias="step-icon">step.svg</file>
 		<file alias="cheat-icon">cheat.svg</file>
+		<file alias="fullscreen-icon">fullscreen.svg</file>
 	</qresource>
 </RCC>

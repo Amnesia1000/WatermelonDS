@@ -747,7 +747,6 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
     if (windowID == 0)
     {
         launcher = new WatermelonLauncher(this);
-        launcher->setGeometry(rect());
         connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
             preloadROMs({path}, {}, true);
         });
@@ -2435,10 +2434,6 @@ void MainWindow::updateFloatingBarPos()
 void MainWindow::resizeEvent(QResizeEvent* event)
 {
     QMainWindow::resizeEvent(event);
-    if (launcher && launcher->isVisible())
-    {
-        launcher->setGeometry(rect());
-    }
     if (floatingBar && floatingBar->isVisible())
     {
         updateFloatingBarPos();
@@ -2547,25 +2542,57 @@ void MainWindow::showLauncher()
 {
     if (floatingBar) floatingBar->hideBar();
 
-    if (launcher)
-    {
-        launcher->setGeometry(rect());
-        launcher->show();
-        launcher->raise();
-        launcher->refresh();
-    }
-
     if (hasMenu)
     {
         menuBar()->hide();
     }
+
+    if (centralWidget() == launcher && launcher != nullptr)
+    {
+        launcher->refresh();
+        return;
+    }
+
+    takeCentralWidget();
+    if (panel)
+    {
+        panel->setParent(this);
+        panel->hide();
+    }
+
+    if (!launcher)
+    {
+        launcher = new WatermelonLauncher(this);
+        connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
+            preloadROMs({path}, {}, true);
+        });
+        connect(launcher, &WatermelonLauncher::openFileRequested, this, &MainWindow::onOpenFile);
+    }
+
+    setCentralWidget(launcher);
+    launcher->show();
+    launcher->refresh();
 }
 
 void MainWindow::showEmulator()
 {
+    if (centralWidget() == panel && panel != nullptr)
+    {
+        return;
+    }
+
+    takeCentralWidget();
     if (launcher)
     {
+        launcher->setParent(this);
         launcher->hide();
+    }
+
+    if (panel)
+    {
+        setCentralWidget(panel);
+        panel->show();
+        emit screenLayoutChange();
     }
 
     if (hasMenu)

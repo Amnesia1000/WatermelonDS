@@ -1156,7 +1156,7 @@ QString WatermelonLauncher::computeRAHash(const QString& romPath)
     };
 
     // rcheevos order: header(0x160) → ARM9 → ARM7 → icon/title(0xA00)
-    md5.addData(QByteArrayView(header.constData(), 0x160));
+    md5.addData(header.constData(), 0x160);
     hashSection(arm9Offset + baseOffset, arm9Size);
     hashSection(arm7Offset + baseOffset, arm7Size);
 

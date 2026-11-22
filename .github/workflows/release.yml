@@ -1,0 +1,99 @@
+name: Release Builds
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build extra-cmake-modules libpcap0.8-dev libsdl2-dev libenet-dev \
+            qt6-base-dev qt6-base-private-dev qt6-multimedia-dev libqt6svg6-dev libarchive-dev libzstd-dev libfuse2 libfaad-dev
+      - name: Configure and Build
+        run: |
+          cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DMELONDS_EMBED_BUILD_INFO=ON
+          cmake --build build -j$(nproc)
+          DESTDIR=AppDir cmake --install build
+      - name: Create Tarball
+        run: |
+          mkdir -p package/WatermelonDS
+          cp build/melonDS package/WatermelonDS/watermelonds
+          cp -r res/icon package/WatermelonDS/
+          cp README.md LICENSE package/WatermelonDS/ 2>/dev/null || true
+          cd package && tar -czf ../WatermelonDS-linux-x86_64.tar.gz WatermelonDS && cd ..
+      - name: Build AppImage
+        continue-on-error: true
+        env:
+          QMAKE: /usr/lib/qt6/bin/qmake
+        run: |
+          wget https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          wget https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage
+          chmod +x linuxdeploy*.AppImage
+          ./linuxdeploy-x86_64.AppImage --appdir AppDir --plugin qt --output appimage
+          mv melonDS*.AppImage WatermelonDS-linux-x86_64.AppImage || true
+      - name: Upload Linux Release Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            WatermelonDS-linux-x86_64.tar.gz
+            WatermelonDS-linux-x86_64.AppImage
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg_cache,readwrite
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ucrt64
+          update: true
+          pacboy: gcc:p cmake:p ninja:p make:p
+      - name: Restore vcpkg cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-x86_64-mingw-${{ hashFiles('vcpkg.json') }}
+          restore-keys: vcpkg-x86_64-mingw-
+      - name: Set up vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgJsonGlob: vcpkg.json
+      - name: Configure
+        run: cmake --preset=release-mingw-x86_64 -DMELONDS_EMBED_BUILD_INFO=ON
+      - name: Build
+        run: cmake --build --preset=release-mingw-x86_64
+      - name: Package Windows ZIP
+        shell: bash
+        run: |
+          mkdir -p package/WatermelonDS
+          cp ./build/release-mingw-x86_64/melonDS.exe package/WatermelonDS/WatermelonDS.exe
+          cp README.md LICENSE package/WatermelonDS/ 2>/dev/null || true
+          cd package && 7z a -tzip ../WatermelonDS-windows-x86_64.zip WatermelonDS && cd ..
+      - name: Upload Windows Release Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: WatermelonDS-windows-x86_64.zip
+      - name: Save vcpkg cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/vcpkg_cache
+          key: vcpkg-x86_64-mingw-${{ hashFiles('vcpkg.json') }}

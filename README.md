@@ -1,66 +1,144 @@
-# melonDS Android
+# 🍉 WatermelonDS (Desktop Edition)
 
-Android port of the DS emulator, melonDS.
+<div align="center">
+  <img src="res/icon/melon_256x256.png" width="120" height="120" alt="WatermelonDS Logo">
+  <h3>Un emulador de Nintendo DS & DSi moderno, elegante y potente para Linux y Windows.</h3>
 
-This is just the core library with the appropriate changes required to make melonDS build for Android. An example of a
-working frontend can be found in the [melonDS Android](https://github.com/rafaelvcaetano/melonDS-android) repository.
+  <p>
+    <a href="https://github.com/Amnesia1000/WatermelonDS/releases"><img src="https://img.shields.io/github/v/release/Amnesia1000/WatermelonDS?style=for-the-badge&color=6fbf4a&label=Release" alt="Latest Release"></a>
+    <a href="https://github.com/Amnesia1000/WatermelonDS/actions/workflows/build-windows.yml"><img src="https://img.shields.io/github/actions/workflow/status/Amnesia1000/WatermelonDS/build-windows.yml?style=for-the-badge&label=Windows%20CI" alt="Windows Build"></a>
+    <a href="https://github.com/Amnesia1000/WatermelonDS/actions/workflows/build-ubuntu.yml"><img src="https://img.shields.io/github/actions/workflow/status/Amnesia1000/WatermelonDS/build-ubuntu.yml?style=for-the-badge&label=Linux%20CI" alt="Linux Build"></a>
+    <img src="https://img.shields.io/badge/Platforms-Linux%20%7C%20Windows-blue?style=for-the-badge" alt="Platforms">
+    <img src="https://img.shields.io/badge/Framework-Qt%206%20%7C%20C%2B%2B17-blueviolet?style=for-the-badge" alt="Framework">
+    <img src="https://img.shields.io/badge/License-GPLv3-yellow.svg?style=for-the-badge" alt="License">
+  </p>
+</div>
 
-<p align="center"><img src="https://raw.githubusercontent.com/Arisotura/melonDS/master/res/icon/melon_128x128.png"></p>
-<h2 align="center"><b>melonDS</b></h2>
-DS emulator, sorta
+---
 
-The goal is to do things right and fast, akin to blargSNES (but hopefully better). But also to, you know, have a fun challenge :)
-<hr>
+## 📖 Acerca del Proyecto / About the Project
 
-## How to use
+**WatermelonDS Desktop** es una reimaginación moderna del frontend del emulador de Nintendo DS y Nintendo DSi para ordenadores de escritorio.
 
-Firmware boot (not direct boot) requires a BIOS/firmware dump from an original DS or DS Lite.
-DS firmwares dumped from a DSi or 3DS aren't bootable and only contain configuration data, thus they are only suitable when booting games directly.
+Este proyecto nace combinando lo mejor de dos mundos:
+1. **El motor de emulación de [melonDS](https://github.com/melonDS-emu/melonDS)**: Desarrollado por *StapleButter* y el equipo de melonDS, reconocido por su gran precisión, soporte de DSi, emulación Wi-Fi/LAN, JIT y motores de renderizado 3D (OpenGL, Software y cómputo).
+2. **La filosofía de diseño y experiencia de usuario de [WatermelonDS](https://github.com/SapphireRhodonite/melonDS-android-lib)**: Basado e inspirado en la versión para Android de *SapphireRhodonite* y *rafaelvcaetano* ([melonDS Android](https://github.com/rafaelvcaetano/melonDS-android)), trasladando la experiencia visual fluida, la biblioteca con descarga de carátulas en alta resolución y una navegación limpia e intuitiva al escritorio mediante **C++17 y Qt 6**.
 
-### Possible firmware sizes
+---
 
- * 128KB: DSi/3DS DS-mode firmware (reduced size due to lacking bootcode)
- * 256KB: regular DS firmware
- * 512KB: iQue DS firmware
+## ✨ Características Principales
 
-DS BIOS dumps from a DSi or 3DS can be used with no compatibility issues. DSi BIOS dumps (in DSi mode) are not compatible. Or maybe they are. I don't know.
+### 🍉 Biblioteca Visual y Lanzador de Juegos (Game Hub)
+- **Cuadrícula con carátulas automáticas**: Descarga y muestra automáticamente portadas de alta definición de tu colección de juegos.
+- **Estantería «Continuar Jugando»**: Acceso inmediato con un clic a los títulos jugados recientemente.
+- **Buscador en tiempo real**: Encuentra tus juegos al instante buscando por título, nombre de archivo o código de juego (Game Code).
+- **Menú contextual rápido**: Clic derecho en cualquier carátula para Iniciar, Configurar opciones específicas, Gestionar trucos o Consultar logros.
 
-As for the rest, the interface should be pretty straightforward. If you have a question, don't hesitate to ask, though!
+### 🕹️ Barra Flotante In-Game (HUD)
+- **Pantalla limpia al 100%**: Se elimina la barra de menús tradicional (`Menu Bar`) para que los juegos ocupen todo el viewport sin barras estorbando.
+- **Controles automáticos al pasar el ratón**: Al acercar el cursor al borde superior de la ventana (`y <= 60px`), aparece suavemente una elegante barra flotante en forma de píldora translúcida con:
+  - ⏸ **Pausar / ▶ Continuar**: Pausa o reanuda la emulación inmediatamente con icono dinámico.
+  - ⏭ **Paso a paso (Frame Step)**: Avanza la emulación fotograma a fotograma.
+  - 🔄 **Reiniciar**: Resetea el juego en ejecución.
+  - ⏹ **Detener**: Finaliza la partida de forma segura y vuelve fluidamente a la biblioteca.
+  - ⚙ **Ajustes**: Abre la configuración unificada directamente.
+  - ⛶ **Pantalla completa**: Alterna entre pantalla completa y ventana.
+- **Ocultación inteligente**: Se desvanece de forma automática tras unos segundos de inactividad del ratón.
 
-## How to build
-See [BUILD.md](./BUILD.md) for build instructions.
+### ⚙️ Diálogo de Ajustes Unificado (Modern Settings)
+- **Diseño lateral moderno**: Inspirado en emuladores contemporáneos (Ryujinx, Yuzu, Lichii), agrupando todas las opciones de forma limpia en pestañas laterales:
+  - **General**: Idioma del firmware, nombre de usuario, mensaje personal y selector de color favorito con muestras de color visuales.
+  - **Sistema**: Tipo de consola (DS / DSi), selector gráfico de BIOS y Firmware personalizados, y tamaño de bloque JIT.
+  - **Gráficos**: Motor 3D (OpenGL, Vulkan, Software), escalado interno, filtro de texturas y sincronización vertical.
+  - **Audio & Micrófono**: Dispositivos de salida, volumen, interpolación y fuentes de micrófono (ruido blanco, patrón o micrófono real).
+  - **Mando & Controles**: Interfaz visual de mapeo interactivo replicando la silueta original de la Nintendo DS con soporte para teclado y mandos vía SDL2.
+  - **Logros (RetroAchievements)**: Configuración completa de Hardcore Mode, Rich Presence, sonidos y logros no oficiales.
 
-## TODO LIST
+### 👾 Pestaña de Trucos (Action Replay Cheats)
+- **Configuración individual por juego**: Cada ROM cuenta con su propia gestión de trucos en los detalles del juego.
+- **Interruptor maestro**: Activa o desactiva la aplicación de trucos para el juego actual.
+- **Árbol jerárquico**: Lista ordenada de categorías y códigos Action Replay con casillas de verificación para activar solo los trucos deseados.
+- **➕ Añadir truco manual**: Formulario integrado con validación hexadecimal para agregar códigos personalizados fácilmente.
+- **📥 Importar base de datos (`usrcheat.dat`)**: Carga archivos de base de datos R4 / Action Replay; WatermelonDS detecta de forma automática los trucos correspondientes al código de la ROM.
 
- * better DSi emulation
- * better OpenGL rendering
- * netplay
- * the impossible quest of pixel-perfect 3D graphics
- * support for rendering screens to separate windows
- * emulating some fancy addons
- * other non-core shit (debugger, graphics viewers, etc)
+### 🏆 RetroAchievements
+- Acceso desde la ventana principal con un diálogo de resumen de perfil de usuario (avatar, puntos Hardcore/Softcore, rango y estadísticas).
+- Lista detallada de logros por juego, con estado de desbloqueo, insignias y progreso.
 
-### TODO LIST FOR LATER (low priority)
+### 🎨 Shaders de Post-Procesado
+- Compatibilidad con presets de shaders de RetroArch (`.slangp` y `.glslp`).
+- Selector visual de shaders con previsualización en vivo y configuración global o individual por juego.
 
- * big-endian compatibility (Wii, etc)
- * LCD refresh time (used by some games for blending effects)
- * any feature you can eventually ask for that isn't outright stupid
+---
 
-## Credits
+## 📥 Descargas / Downloads
 
- * Martin for GBAtek, a good piece of documentation
- * Cydrak for the extra 3D GPU research
- * limittox for the icon
- * All of you comrades who have been testing melonDS, reporting issues, suggesting shit, etc
+Puedes descargar la última versión compilada para tu sistema operativo desde la sección de **[Releases](https://github.com/Amnesia1000/WatermelonDS/releases)**:
 
-## Licenses
+| Plataforma | Formato | Notas |
+| :--- | :--- | :--- |
+| 🐧 **Linux** (x86_64) | `.tar.gz` / `.AppImage` | Compatible con Ubuntu, Debian, Fedora, Arch Linux y derivadas. |
+| 🪟 **Windows** (x86_64) | `.zip` (Portable) | Descomprimir y ejecutar `WatermelonDS.exe`. |
 
-[![GNU GPLv3 Image](https://www.gnu.org/graphics/gplv3-127x51.png)](http://www.gnu.org/licenses/gpl-3.0.en.html)
+---
 
-melonDS is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+## 🛠️ Compilación desde el código fuente / Building from Source
 
-### External
-* Images used in the Input Config Dialog - see `src/frontend/qt_sdl/InputConfig/resources/LICENSE.md`
+### Requisitos previos
+- Compilador con soporte para **C++17** (GCC 9+, Clang 10+, MSVC 2019+).
+- **CMake** 3.16 o superior y **Ninja** (o Make).
+- **Qt 6** (o Qt 5) con módulos: `Core`, `Gui`, `Widgets`, `Network`, `Multimedia`, `OpenGL`, `OpenGLWidgets`, `Svg`.
+- **SDL2**, **libarchive**, **libzstd**, **faad2**, **enet**.
+
+### En Linux (Ubuntu / Debian / Linux Mint):
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build git \
+  qt6-base-dev qt6-base-private-dev qt6-multimedia-dev libqt6svg6-dev \
+  libsdl2-dev libarchive-dev libzstd-dev libfaad-dev libenet-dev libpcap-dev
+
+git clone https://github.com/Amnesia1000/WatermelonDS.git
+cd WatermelonDS
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+
+# Ejecutar
+./build/melonDS
+```
+
+### En Linux (Arch Linux / Manjaro):
+```bash
+sudo pacman -S base-devel cmake ninja git qt6-base qt6-multimedia qt6-svg sdl2 libarchive zstd faad2 enet libpcap
+
+git clone https://github.com/Amnesia1000/WatermelonDS.git
+cd WatermelonDS
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+```
+
+### En Windows (MSYS2 UCRT64 / MinGW):
+```bash
+pacman -S mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja \
+  mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-multimedia mingw-w64-ucrt-x86_64-qt6-svg \
+  mingw-w64-ucrt-x86_64-sdl2 mingw-w64-ucrt-x86_64-libarchive mingw-w64-ucrt-x86_64-zstd
+
+git clone https://github.com/Amnesia1000/WatermelonDS.git
+cd WatermelonDS
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+---
+
+## 🤝 Créditos y Agradecimientos
+
+- **[melonDS](https://github.com/melonDS-emu/melonDS)**: Creado por **StapleButter** (Arisotura) y todos los increíbles colaboradores de melonDS.
+- **[WatermelonDS / melonDS-android](https://github.com/rafaelvcaetano/melonDS-android)**: Desarrollado por **rafaelvcaetano** y **[SapphireRhodonite](https://github.com/SapphireRhodonite/melonDS-android-lib)**, cuya interfaz y experiencia inspiraron esta versión de escritorio.
+- **[RetroAchievements](https://retroachievements.org/)**: Por su API y plataforma abierta para la comunidad retro.
+- Todos los autores de emuladores modernos cuyas interfaces inspiraron los componentes visuales de este proyecto.
+
+---
+
+## 📄 Licencia
+
+Este proyecto está licenciado bajo los términos de la **GNU General Public License v3.0 (GPLv3)**. Consulta el archivo [LICENSE](LICENSE) para más detalles.

@@ -26,7 +26,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build extra-cmake-modules libpcap0.8-dev libsdl2-dev libenet-dev \
-            qt6-base-dev qt6-base-private-dev qt6-multimedia-dev libqt6svg6-dev libarchive-dev libzstd-dev libfuse2 libfaad-dev
+            qt6-base-dev qt6-base-private-dev qt6-multimedia-dev libqt6svg6-dev libarchive-dev libzstd-dev libfuse2 libfaad-dev libvulkan-dev
       - name: Configure and Build
         run: |
           cmake -B build -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DMELONDS_EMBED_BUILD_INFO=ON

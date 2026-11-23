@@ -36,6 +36,9 @@
 #include <QVector>
 #include <QCommandLineParser>
 #include <QStandardPaths>
+#include <QLocale>
+#include <QLibraryInfo>
+#include <QTranslator>
 #ifndef _WIN32
 #include <QGuiApplication>
 #include <QSocketNotifier>
@@ -72,6 +75,28 @@ QString* systemThemeName;
 
 
 QString emuDirectory;
+
+static void InstallUITranslators(QApplication& app)
+{
+    static QTranslator appTranslator;
+    static QTranslator qtTranslator;
+
+    QString lang = Config::GetGlobalTable().GetQString("UI.Language");
+    if (lang.isEmpty())
+    {
+        // auto: follow the system locale, falling back to English
+        lang = QLocale::system().name().section(QLatin1Char('_'), 0, 0);
+        if (lang != "es" && lang != "en")
+            lang = "en";
+    }
+
+    if (appTranslator.load(":/i18n/watermelon_" + lang))
+        app.installTranslator(&appTranslator);
+
+    const QString qtDir = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
+    if (qtTranslator.load("qtbase_" + lang, qtDir))
+        app.installTranslator(&qtTranslator);
+}
 
 const int kMaxEmuInstances = 16;
 EmuInstance* emuInstances[kMaxEmuInstances];
@@ -331,6 +356,8 @@ int main(int argc, char** argv)
         QMessageBox::critical(nullptr,
                               "melonDS",
                               "Unable to write to config.\nPlease check the write permissions of the folder you placed melonDS in.");
+
+    InstallUITranslators(melon);
 
     camStarted[0] = false;
     camStarted[1] = false;

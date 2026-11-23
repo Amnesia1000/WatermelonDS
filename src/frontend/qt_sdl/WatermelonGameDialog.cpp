@@ -147,7 +147,7 @@ public:
         m_valueWidget->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         lay->addWidget(m_valueWidget);
 
-        m_chevron = new QLabel(QStringLiteral("›"), this);
+        m_chevron = new QLabel(tr("›"), this);
         m_chevron->setStyleSheet(QStringLiteral(
             "font-size: 18px; color: #4a4859; background: transparent; padding-left: 2px;"
         ));
@@ -222,7 +222,7 @@ private:
 WatermelonGameDialog::WatermelonGameDialog(const WatermelonRom& rom, int initialTab, QWidget* parent)
     : QDialog(parent), romInfo(rom)
 {
-    setWindowTitle(QStringLiteral("%1 — Opciones").arg(rom.title));
+    setWindowTitle(tr("%1 — Opciones").arg(rom.title));
     setMinimumSize(660, 660);
     resize(720, 720);
     setModal(true);
@@ -275,7 +275,7 @@ void WatermelonGameDialog::setupUI(int initialTab)
     if (!romInfo.cover.isNull())
         coverLbl->setPixmap(romInfo.cover.scaled(coverLbl->size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
     else
-        coverLbl->setText(QStringLiteral("🎮"));
+        coverLbl->setText(tr("🎮"));
     hLay->addWidget(coverLbl);
 
     // Info
@@ -302,7 +302,7 @@ void WatermelonGameDialog::setupUI(int initialTab)
     }
     QFileInfo fi(romInfo.filePath);
     double mb = fi.size() / (1024.0 * 1024.0);
-    pillRow->addWidget(makePill(QStringLiteral("%1 MB").arg(mb, 0, 'f', 1),
+    pillRow->addWidget(makePill(tr("%1 MB").arg(mb, 0, 'f', 1),
         QColor(0xb3,0xb1,0xbd), QColor(0x24,0x23,0x2f), headerWidget));
     pillRow->addStretch();
     infoLay->addLayout(pillRow);
@@ -318,7 +318,7 @@ void WatermelonGameDialog::setupUI(int initialTab)
     hLay->addLayout(infoLay, 1);
 
     // Play button
-    auto* btnPlay = new QPushButton(QStringLiteral("▶  Iniciar"), headerWidget);
+    auto* btnPlay = new QPushButton(tr("▶  Iniciar"), headerWidget);
     btnPlay->setFixedSize(100, 36);
     btnPlay->setStyleSheet(QStringLiteral(
         "QPushButton {"
@@ -357,10 +357,10 @@ void WatermelonGameDialog::setupUI(int initialTab)
         "QTabBar::tab:hover:!selected { color: #c0bed0; }"
     ));
 
-    tabWidget->addTab(createConfigTab(),            QStringLiteral("⚙  Configuración"));
-    tabWidget->addTab(createCheatsTab(),            QStringLiteral("👾  Trucos"));
-    tabWidget->addTab(createRetroAchievementsTab(), QStringLiteral("🏆  RetroAchievements"));
-    tabWidget->addTab(createOfflineTab(),           QStringLiteral("📴  Offline"));
+    tabWidget->addTab(createConfigTab(),            tr("⚙  Configuración"));
+    tabWidget->addTab(createCheatsTab(),            tr("👾  Trucos"));
+    tabWidget->addTab(createRetroAchievementsTab(), tr("🏆  RetroAchievements"));
+    tabWidget->addTab(createOfflineTab(),           tr("📴  Offline"));
     tabWidget->setCurrentIndex(qBound(0, initialTab, 3));
 
     connect(tabWidget, &QTabWidget::currentChanged, this, [this](int idx) {
@@ -427,7 +427,7 @@ QWidget* WatermelonGameDialog::createConfigTab()
         auto* nLay = new QHBoxLayout(nameRow);
         nLay->setContentsMargins(16, 0, 14, 0);
         nLay->setSpacing(8);
-        auto* lbl = new QLabel(QStringLiteral("Nombre del juego"), nameRow);
+        auto* lbl = new QLabel(tr("Nombre del juego"), nameRow);
         lbl->setStyleSheet(QStringLiteral(
             "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
         nLay->addWidget(lbl, 1);
@@ -441,10 +441,10 @@ QWidget* WatermelonGameDialog::createConfigTab()
         nLay->addWidget(val);
     }
 
-    pickerConsole = new PickerRow(QStringLiteral("Tipo de consola"),
-        {QStringLiteral("Global (DS)"), QStringLiteral("Nintendo DS"), QStringLiteral("Nintendo DSi")},
+    pickerConsole = new PickerRow(tr("Tipo de consola"),
+        {tr("Global (DS)"), tr("Nintendo DS"), tr("Nintendo DSi")},
         0);
-    pickerBoot = new PickerRow(QStringLiteral("Arranque directo"),
+    pickerBoot = new PickerRow(tr("Arranque directo"),
         {QStringLiteral("Global"), QStringLiteral("Activado"), QStringLiteral("Desactivado")},
         0);
 
@@ -453,8 +453,8 @@ QWidget* WatermelonGameDialog::createConfigTab()
     // ── VÍDEO ─────────────────────────────────────────────────────────────
     cLay->addWidget(makeSectionLabel(QStringLiteral("Vídeo"), content));
 
-    pickerRenderer = new PickerRow(QStringLiteral("Motor de renderizado 3D"),
-        {QStringLiteral("Global"), QStringLiteral("Software"), QStringLiteral("OpenGL (Hardware)")},
+    pickerRenderer = new PickerRow(tr("Motor de renderizado 3D"),
+        {QStringLiteral("Global"), QStringLiteral("Software"), tr("OpenGL (Hardware)")},
         0);
 
     // Shader row (custom)
@@ -464,18 +464,18 @@ QWidget* WatermelonGameDialog::createConfigTab()
         auto* sLay = new QHBoxLayout(shaderRow);
         sLay->setContentsMargins(16, 0, 10, 0);
         sLay->setSpacing(8);
-        auto* sLbl = new QLabel(QStringLiteral("Shader RetroArch"), shaderRow);
+        auto* sLbl = new QLabel(tr("Shader RetroArch"), shaderRow);
         sLbl->setStyleSheet(QStringLiteral(
             "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
         sLay->addWidget(sLbl, 1);
 
-        shaderLabel = new QLabel(QStringLiteral("Global"), shaderRow);
+        shaderLabel = new QLabel(tr("Global"), shaderRow);
         shaderLabel->setStyleSheet(QStringLiteral(
             "font-size: 12px; color: #b3b1bd; background: transparent; max-width: 160px;"));
         shaderLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
         sLay->addWidget(shaderLabel);
 
-        auto* btnChange = new QPushButton(QStringLiteral("  Cambiar  "), shaderRow);
+        auto* btnChange = new QPushButton(tr("  Cambiar  "), shaderRow);
         btnChange->setMinimumWidth(80);
         btnChange->setFixedHeight(28);
         btnChange->setStyleSheet(QStringLiteral(
@@ -486,7 +486,7 @@ QWidget* WatermelonGameDialog::createConfigTab()
         connect(btnChange, &QPushButton::clicked, this, &WatermelonGameDialog::onChooseShaderClicked);
         sLay->addWidget(btnChange);
 
-        auto* btnClear = new QPushButton(QStringLiteral("  Quitar  "), shaderRow);
+        auto* btnClear = new QPushButton(tr("  Quitar  "), shaderRow);
         btnClear->setMinimumWidth(60);
         btnClear->setFixedHeight(28);
         btnClear->setStyleSheet(QStringLiteral(
@@ -503,12 +503,12 @@ QWidget* WatermelonGameDialog::createConfigTab()
     // ── RENDIMIENTO ───────────────────────────────────────────────────────
     cLay->addWidget(makeSectionLabel(QStringLiteral("Rendimiento"), content));
 
-    pickerJit = new PickerRow(QStringLiteral("JIT (compilador nativo)"),
+    pickerJit = new PickerRow(tr("JIT (compilador nativo)"),
         {QStringLiteral("Global"), QStringLiteral("Activado"), QStringLiteral("Desactivado")},
         0);
-    pickerMic = new PickerRow(QStringLiteral("Fuente de micrófono"),
-        {QStringLiteral("Global"), QStringLiteral("Silencio"), QStringLiteral("Ruido blanco"),
-         QStringLiteral("Micrófono del sistema")},
+    pickerMic = new PickerRow(tr("Fuente de micrófono"),
+        {QStringLiteral("Global"), QStringLiteral("Silencio"), tr("Ruido blanco"),
+         tr("Micrófono del sistema")},
         0);
 
     cLay->addWidget(buildSection({}, {pickerJit, pickerMic}, content));
@@ -525,14 +525,14 @@ QWidget* WatermelonGameDialog::createConfigTab()
         auto* rLay = new QHBoxLayout(raStatusRow);
         rLay->setContentsMargins(16, 0, 14, 0);
         rLay->setSpacing(8);
-        auto* lbl = new QLabel(QStringLiteral("Estado"), raStatusRow);
+        auto* lbl = new QLabel(tr("Estado"), raStatusRow);
         lbl->setStyleSheet(QStringLiteral(
             "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
         rLay->addWidget(lbl, 1);
 
         QString stateText = raUser.isEmpty()
-            ? QStringLiteral("No conectado")
-            : (raEn ? QStringLiteral("Activo como %1").arg(raUser)
+            ? tr("No conectado")
+            : (raEn ? tr("Activo como %1").arg(raUser)
                     : QStringLiteral("Desactivado"));
         QColor stateColor = raUser.isEmpty() ? QColor(0x7a,0x78,0x88)
                           : (raEn ? QColor(0x6f,0xbf,0x4a) : QColor(0xe5,0x53,0x4b));
@@ -549,12 +549,12 @@ QWidget* WatermelonGameDialog::createConfigTab()
         auto* mLay = new QHBoxLayout(raModeRow);
         mLay->setContentsMargins(16, 0, 14, 0);
         mLay->setSpacing(8);
-        auto* lbl = new QLabel(QStringLiteral("Modo"), raModeRow);
+        auto* lbl = new QLabel(tr("Modo"), raModeRow);
         lbl->setStyleSheet(QStringLiteral(
             "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
         mLay->addWidget(lbl, 1);
         mLay->addWidget(makePill(
-            raHC ? QStringLiteral("🔒 Hardcore") : QStringLiteral("Softcore"),
+            raHC ? tr("🔒 Hardcore") : QStringLiteral("Softcore"),
             raHC ? QColor(0xe5,0x53,0x4b) : QColor(0x6f,0xbf,0x4a),
             raHC ? QColor(0x2a,0x18,0x18) : QColor(0x1a,0x2e,0x18),
             raModeRow), 0, Qt::AlignVCenter);
@@ -578,7 +578,7 @@ QWidget* WatermelonGameDialog::createConfigTab()
     bLay->setContentsMargins(16, 0, 16, 0);
     bLay->addStretch();
 
-    auto* btnSave = new QPushButton(QStringLiteral("💾  Guardar configuración"), bar);
+    auto* btnSave = new QPushButton(tr("💾  Guardar configuración"), bar);
     btnSave->setFixedHeight(36);
     btnSave->setStyleSheet(QStringLiteral(
         "QPushButton {"
@@ -646,9 +646,9 @@ QWidget* WatermelonGameDialog::createCheatsTab()
 
     auto* mTextLay = new QVBoxLayout();
     mTextLay->setSpacing(3);
-    auto* mLblTitle = new QLabel(QStringLiteral("Habilitar trucos para este juego"), masterCard);
+    auto* mLblTitle = new QLabel(tr("Habilitar trucos para este juego"), masterCard);
     mLblTitle->setStyleSheet(QStringLiteral("font-size: 14px; font-weight: 700; color: #f6f5f3; background: transparent; border: none;"));
-    auto* mLblSub = new QLabel(QStringLiteral("Aplica los códigos Action Replay seleccionados abajo durante la emulación."), masterCard);
+    auto* mLblSub = new QLabel(tr("Aplica los códigos Action Replay seleccionados abajo durante la emulación."), masterCard);
     mLblSub->setStyleSheet(QStringLiteral("font-size: 12px; color: #8a8898; background: transparent; border: none;"));
     mTextLay->addWidget(mLblTitle);
     mTextLay->addWidget(mLblSub);
@@ -669,7 +669,7 @@ QWidget* WatermelonGameDialog::createCheatsTab()
     lLay->setSpacing(12);
 
     auto* lHeaderLay = new QHBoxLayout();
-    auto* lTitle = new QLabel(QStringLiteral("Lista de trucos disponibles"), listCard);
+    auto* lTitle = new QLabel(tr("Lista de trucos disponibles"), listCard);
     lTitle->setStyleSheet(QStringLiteral("font-size: 14px; font-weight: 700; color: #f6f5f3; background: transparent; border: none;"));
     lHeaderLay->addWidget(lTitle);
 
@@ -678,7 +678,7 @@ QWidget* WatermelonGameDialog::createCheatsTab()
     lHeaderLay->addWidget(cheatsStatusLabel);
     lHeaderLay->addStretch(1);
 
-    auto* btnAddCheat = new QPushButton(QStringLiteral("➕ Añadir truco"), listCard);
+    auto* btnAddCheat = new QPushButton(tr("➕ Añadir truco"), listCard);
     btnAddCheat->setCursor(Qt::PointingHandCursor);
     btnAddCheat->setStyleSheet(QStringLiteral(
         "QPushButton { background: #232230; color: #f6f5f3; border: 1px solid #333244; "
@@ -688,7 +688,7 @@ QWidget* WatermelonGameDialog::createCheatsTab()
     connect(btnAddCheat, &QPushButton::clicked, this, &WatermelonGameDialog::onAddCheatClicked);
     lHeaderLay->addWidget(btnAddCheat);
 
-    auto* btnImportDb = new QPushButton(QStringLiteral("📥 Importar base de datos..."), listCard);
+    auto* btnImportDb = new QPushButton(tr("📥 Importar base de datos..."), listCard);
     btnImportDb->setCursor(Qt::PointingHandCursor);
     btnImportDb->setStyleSheet(QStringLiteral(
         "QPushButton { background: #232230; color: #f6f5f3; border: 1px solid #333244; "
@@ -721,13 +721,13 @@ QWidget* WatermelonGameDialog::createCheatsTab()
     auto* eLay = new QVBoxLayout(emptyCheatsWidget);
     eLay->setContentsMargins(20, 30, 20, 30);
     eLay->setSpacing(10);
-    auto* lblEmptyIcon = new QLabel(QStringLiteral("👾"), emptyCheatsWidget);
+    auto* lblEmptyIcon = new QLabel(tr("👾"), emptyCheatsWidget);
     lblEmptyIcon->setAlignment(Qt::AlignCenter);
     lblEmptyIcon->setStyleSheet(QStringLiteral("font-size: 38px; background: transparent; border: none;"));
-    auto* lblEmptyText = new QLabel(QStringLiteral("No hay trucos guardados para este juego"), emptyCheatsWidget);
+    auto* lblEmptyText = new QLabel(tr("No hay trucos guardados para este juego"), emptyCheatsWidget);
     lblEmptyText->setAlignment(Qt::AlignCenter);
     lblEmptyText->setStyleSheet(QStringLiteral("font-size: 14px; font-weight: 700; color: #f6f5f3; background: transparent; border: none;"));
-    auto* lblEmptySub = new QLabel(QStringLiteral("Puedes añadir trucos manualmente con el botón \"Añadir truco\" o importar una base de datos Action Replay / R4 (.dat)."), emptyCheatsWidget);
+    auto* lblEmptySub = new QLabel(tr("Puedes añadir trucos manualmente con el botón \"Añadir truco\" o importar una base de datos Action Replay / R4 (.dat)."), emptyCheatsWidget);
     lblEmptySub->setAlignment(Qt::AlignCenter);
     lblEmptySub->setWordWrap(true);
     lblEmptySub->setStyleSheet(QStringLiteral("font-size: 12px; color: #8a8898; background: transparent; border: none;"));
@@ -798,9 +798,9 @@ void WatermelonGameDialog::populateCheatTree()
     if (treeCheats) treeCheats->setVisible(totalCheats > 0);
     if (cheatsStatusLabel) {
         if (totalCheats > 0)
-            cheatsStatusLabel->setText(QStringLiteral("(%1 activos de %2 disponibles)").arg(enabledCheats).arg(totalCheats));
+            cheatsStatusLabel->setText(tr("(%1 activos de %2 disponibles)").arg(enabledCheats).arg(totalCheats));
         else
-            cheatsStatusLabel->setText(QStringLiteral("(0 trucos)"));
+            cheatsStatusLabel->setText(tr("(0 trucos)"));
     }
 
     loadingCheatItems = false;
@@ -835,7 +835,7 @@ void WatermelonGameDialog::onCheatItemChanged(QTreeWidgetItem* item, int column)
     };
     if (gameCheatFile) countCat(gameCheatFile->RootCat);
     if (cheatsStatusLabel) {
-        cheatsStatusLabel->setText(QStringLiteral("(%1 activos de %2 disponibles)").arg(enabledCheats).arg(totalCheats));
+        cheatsStatusLabel->setText(tr("(%1 activos de %2 disponibles)").arg(enabledCheats).arg(totalCheats));
     }
 }
 
@@ -844,7 +844,7 @@ void WatermelonGameDialog::onAddCheatClicked()
     if (!gameCheatFile) return;
 
     QDialog dlg(this);
-    dlg.setWindowTitle(QStringLiteral("Añadir truco Action Replay"));
+    dlg.setWindowTitle(tr("Añadir truco Action Replay"));
     dlg.resize(460, 360);
     dlg.setStyleSheet(QStringLiteral(
         "QDialog { background: #171622; color: #f6f5f3; }"
@@ -860,33 +860,33 @@ void WatermelonGameDialog::onAddCheatClicked()
     lay->setContentsMargins(20, 20, 20, 20);
     lay->setSpacing(12);
 
-    lay->addWidget(new QLabel(QStringLiteral("Nombre del truco:"), &dlg));
+    lay->addWidget(new QLabel(tr("Nombre del truco:"), &dlg));
     auto* txtName = new QLineEdit(&dlg);
-    txtName->setPlaceholderText(QStringLiteral("ej. Dinero infinito / Max stats"));
+    txtName->setPlaceholderText(tr("ej. Dinero infinito / Max stats"));
     lay->addWidget(txtName);
 
-    lay->addWidget(new QLabel(QStringLiteral("Descripción (opcional):"), &dlg));
+    lay->addWidget(new QLabel(tr("Descripción (opcional):"), &dlg));
     auto* txtDesc = new QLineEdit(&dlg);
-    txtDesc->setPlaceholderText(QStringLiteral("ej. Presiona L+R para activar"));
+    txtDesc->setPlaceholderText(tr("ej. Presiona L+R para activar"));
     lay->addWidget(txtDesc);
 
-    lay->addWidget(new QLabel(QStringLiteral("Código Action Replay (hex):"), &dlg));
+    lay->addWidget(new QLabel(tr("Código Action Replay (hex):"), &dlg));
     auto* txtCode = new QPlainTextEdit(&dlg);
-    txtCode->setPlaceholderText(QStringLiteral("XXXXXXXX YYYYYYYY\nXXXXXXXX YYYYYYYY"));
+    txtCode->setPlaceholderText(tr("XXXXXXXX YYYYYYYY\nXXXXXXXX YYYYYYYY"));
     lay->addWidget(txtCode, 1);
 
     auto* btnLay = new QHBoxLayout();
     btnLay->addStretch(1);
-    auto* btnCancel = new QPushButton(QStringLiteral("Cancelar"), &dlg);
+    auto* btnCancel = new QPushButton(tr("Cancelar"), &dlg);
     connect(btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject);
     btnLay->addWidget(btnCancel);
 
-    auto* btnOk = new QPushButton(QStringLiteral("Guardar truco"), &dlg);
+    auto* btnOk = new QPushButton(tr("Guardar truco"), &dlg);
     btnOk->setProperty("primary", true);
     connect(btnOk, &QPushButton::clicked, [&]() {
         QString name = txtName->text().trimmed();
         if (name.isEmpty()) {
-            QMessageBox::warning(&dlg, QStringLiteral("Aviso"), QStringLiteral("Por favor introduce un nombre para el truco."));
+            QMessageBox::warning(&dlg, tr("Aviso"), tr("Por favor introduce un nombre para el truco."));
             return;
         }
 
@@ -900,7 +900,7 @@ void WatermelonGameDialog::onAddCheatClicked()
         }
 
         if (codeVec.empty()) {
-            QMessageBox::warning(&dlg, QStringLiteral("Aviso"), QStringLiteral("Introduce al menos un código Action Replay válido en hexadecimal."));
+            QMessageBox::warning(&dlg, tr("Aviso"), tr("Introduce al menos un código Action Replay válido en hexadecimal."));
             return;
         }
 
@@ -929,15 +929,15 @@ void WatermelonGameDialog::onImportCheatDbClicked()
 
     QString file = QFileDialog::getOpenFileName(
         this,
-        QStringLiteral("Seleccionar base de datos de trucos (usrcheat.dat)"),
+        tr("Seleccionar base de datos de trucos (usrcheat.dat)"),
         QString(),
-        QStringLiteral("Bases de datos de trucos (*.dat);;Todos los archivos (*.*)")
+        tr("Bases de datos de trucos (*.dat);;Todos los archivos (*.*)")
     );
     if (file.isEmpty()) return;
 
     melonDS::ARDatabaseDAT db(file.toStdString());
     if (db.Error) {
-        QMessageBox::critical(this, QStringLiteral("Error"), QStringLiteral("No se pudo abrir la base de datos de trucos seleccionada."));
+        QMessageBox::critical(this, tr("Error"), tr("No se pudo abrir la base de datos de trucos seleccionada."));
         return;
     }
 
@@ -953,8 +953,8 @@ void WatermelonGameDialog::onImportCheatDbClicked()
     if (entries.empty()) {
         QMessageBox::warning(
             this,
-            QStringLiteral("Sin trucos encontrados"),
-            QStringLiteral("No se encontraron trucos para el código de juego %1 en esta base de datos.").arg(romInfo.gameCode)
+            tr("Sin trucos encontrados"),
+            tr("No se encontraron trucos para el código de juego %1 en esta base de datos.").arg(romInfo.gameCode)
         );
         return;
     }
@@ -967,8 +967,8 @@ void WatermelonGameDialog::onImportCheatDbClicked()
 
     QMessageBox::information(
         this,
-        QStringLiteral("Trucos importados"),
-        QStringLiteral("Se importaron exitosamente los trucos para '%1' desde la base de datos.").arg(romInfo.title)
+        tr("Trucos importados"),
+        tr("Se importaron exitosamente los trucos para '%1' desde la base de datos.").arg(romInfo.title)
     );
 }
 
@@ -1000,20 +1000,20 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         // Icon + Title
         auto* iconRow = new QHBoxLayout();
         iconRow->setAlignment(Qt::AlignCenter);
-        auto* icon = new QLabel(QStringLiteral("🏆"), loginPage);
+        auto* icon = new QLabel(tr("🏆"), loginPage);
         icon->setStyleSheet(QStringLiteral("font-size: 44px; background: transparent;"));
         iconRow->addWidget(icon);
         lLay->addLayout(iconRow);
         lLay->addSpacing(4);
 
-        auto* titleLbl = new QLabel(QStringLiteral("RetroAchievements"), loginPage);
+        auto* titleLbl = new QLabel(tr("RetroAchievements"), loginPage);
         titleLbl->setAlignment(Qt::AlignCenter);
         titleLbl->setStyleSheet(QStringLiteral(
             "font-size: 22px; font-weight: 800; color: #f6f5f3; background: transparent;"));
         lLay->addWidget(titleLbl);
 
         auto* subLbl = new QLabel(
-            QStringLiteral("Inicia sesión para ver el progreso de logros de este juego."),
+            tr("Inicia sesión para ver el progreso de logros de este juego."),
             loginPage);
         subLbl->setAlignment(Qt::AlignCenter);
         subLbl->setWordWrap(true);
@@ -1023,12 +1023,12 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         lLay->addSpacing(8);
 
         raUserInput = new QLineEdit(loginPage);
-        raUserInput->setPlaceholderText(QStringLiteral("Usuario de RetroAchievements"));
+        raUserInput->setPlaceholderText(tr("Usuario de RetroAchievements"));
         raUserInput->setFixedHeight(44);
         lLay->addWidget(raUserInput);
 
         raPassInput = new QLineEdit(loginPage);
-        raPassInput->setPlaceholderText(QStringLiteral("Contraseña"));
+        raPassInput->setPlaceholderText(tr("Contraseña"));
         raPassInput->setEchoMode(QLineEdit::Password);
         raPassInput->setFixedHeight(44);
         lLay->addWidget(raPassInput);
@@ -1041,7 +1041,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         raLoginError->hide();
         lLay->addWidget(raLoginError);
 
-        btnRALogin = new QPushButton(QStringLiteral("Iniciar sesión"), loginPage);
+        btnRALogin = new QPushButton(tr("Iniciar sesión"), loginPage);
         btnRALogin->setFixedHeight(42);
         btnRALogin->setStyleSheet(QStringLiteral(
             "QPushButton {"
@@ -1056,7 +1056,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         connect(btnRALogin, &QPushButton::clicked, this, &WatermelonGameDialog::onRALoginClicked);
         lLay->addWidget(btnRALogin);
 
-        auto* btnManage = new QPushButton(QStringLiteral("⚙  Gestionar cuenta global…"), loginPage);
+        auto* btnManage = new QPushButton(tr("⚙  Gestionar cuenta global…"), loginPage);
         btnManage->setStyleSheet(QStringLiteral(
             "QPushButton { background: transparent; color: #5a9bdf; border: none; "
             "font-size: 12px; font-weight: 600; padding: 4px; }"
@@ -1082,7 +1082,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         ldLay->setAlignment(Qt::AlignCenter);
         ldLay->setSpacing(16);
 
-        auto* spinLbl = new QLabel(QStringLiteral("Cargando logros…"), loadPage);
+        auto* spinLbl = new QLabel(tr("Cargando logros…"), loadPage);
         spinLbl->setAlignment(Qt::AlignCenter);
         spinLbl->setStyleSheet(QStringLiteral(
             "font-size: 15px; font-weight: 600; color: #b3b1bd; background: transparent;"));
@@ -1118,7 +1118,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         profLay->setContentsMargins(16, 0, 16, 0);
         profLay->setSpacing(10);
 
-        raUserBadge = new QLabel(QStringLiteral("👤"), profBar);
+        raUserBadge = new QLabel(tr("👤"), profBar);
         raUserBadge->setFixedSize(36, 36);
         raUserBadge->setAlignment(Qt::AlignCenter);
         raUserBadge->setStyleSheet(QStringLiteral(
@@ -1132,13 +1132,13 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
 
         bool hc = WatermelonRADialog::isHardcore();
         auto* modePill = makePill(
-            hc ? QStringLiteral("🔒 Hardcore") : QStringLiteral("Softcore"),
+            hc ? tr("🔒 Hardcore") : QStringLiteral("Softcore"),
             hc ? QColor(0xe5,0x53,0x4b) : QColor(0x6f,0xbf,0x4a),
             hc ? QColor(0x2a,0x18,0x18) : QColor(0x1a,0x2e,0x18),
             profBar);
         profLay->addWidget(modePill, 0, Qt::AlignVCenter);
 
-        auto* btnLogout = new QPushButton(QStringLiteral("Cerrar sesión"), profBar);
+        auto* btnLogout = new QPushButton(tr("Cerrar sesión"), profBar);
         btnLogout->setStyleSheet(QStringLiteral(
             "QPushButton { background: transparent; color: #5a5868; border: 1px solid #35344a; "
             "border-radius: 7px; padding: 4px 10px; font-size: 11px; }"
@@ -1164,7 +1164,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
                 "font-size: 13px; color: #c0bcd0; background: transparent;"));
             sLay->addWidget(raProgressLabel, 1);
 
-            auto* btnWeb = new QPushButton(QStringLiteral("🌐  Ver en web"), raSummaryBar);
+            auto* btnWeb = new QPushButton(tr("🌐  Ver en web"), raSummaryBar);
             btnWeb->setStyleSheet(QStringLiteral(
                 "QPushButton { background: transparent; color: #5a9bdf; border: none; "
                 "font-size: 12px; font-weight: 600; }"
@@ -1201,7 +1201,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         eLay->setSpacing(14);
         eLay->setContentsMargins(40, 40, 40, 40);
 
-        auto* errIcon = new QLabel(QStringLiteral("⚠️"), errPage);
+        auto* errIcon = new QLabel(tr("⚠️"), errPage);
         errIcon->setAlignment(Qt::AlignCenter);
         errIcon->setStyleSheet(QStringLiteral("font-size: 44px; background: transparent;"));
         eLay->addWidget(errIcon);
@@ -1210,7 +1210,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         QString raUser = WatermelonRADialog::getUsername();
         if (!raUser.isEmpty()) {
             auto* userPill = new QLabel(
-                QStringLiteral("🔑  Conectado como: %1").arg(raUser), errPage);
+                tr("🔑  Conectado como: %1").arg(raUser), errPage);
             userPill->setAlignment(Qt::AlignCenter);
             userPill->setStyleSheet(QStringLiteral(
                 "font-size: 12px; font-weight: 600; color: #6fbf4a; "
@@ -1219,7 +1219,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         }
 
         raErrorLabel = new QLabel(
-            QStringLiteral("No se pudieron cargar los logros.\nRevisa tu conexión o credenciales."),
+            tr("No se pudieron cargar los logros.\nRevisa tu conexión o credenciales."),
             errPage);
         raErrorLabel->setAlignment(Qt::AlignCenter);
         raErrorLabel->setWordWrap(true);
@@ -1227,7 +1227,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
             "font-size: 14px; color: #9a98a8; background: transparent; line-height: 150%;"));
         eLay->addWidget(raErrorLabel);
 
-        auto* btnRetry = new QPushButton(QStringLiteral("  Reintentar"), errPage);
+        auto* btnRetry = new QPushButton(tr("  Reintentar"), errPage);
         btnRetry->setIcon(QIcon(QStringLiteral(":/refresh-icon")));
         btnRetry->setFixedSize(150, 40);
         btnRetry->setStyleSheet(QStringLiteral(
@@ -1238,7 +1238,7 @@ QWidget* WatermelonGameDialog::createRetroAchievementsTab()
         connect(btnRetry, &QPushButton::clicked, this, [this]() { loadRAGameData(); });
         eLay->addWidget(btnRetry, 0, Qt::AlignCenter);
 
-        auto* btnSearch = new QPushButton(QStringLiteral("🌐  Buscar en RetroAchievements"), errPage);
+        auto* btnSearch = new QPushButton(tr("🌐  Buscar en RetroAchievements"), errPage);
         btnSearch->setStyleSheet(QStringLiteral(
             "QPushButton { background: transparent; color: #5a9bdf; border: none; "
             "font-size: 12px; font-weight: 600; padding: 4px; }"
@@ -1286,7 +1286,7 @@ QWidget* WatermelonGameDialog::createOfflineTab()
     scLay->setContentsMargins(18, 16, 18, 16);
     scLay->setSpacing(10);
 
-    auto* scHead = new QLabel(QStringLiteral("📴  Modo Offline de RetroAchievements"), statusCard);
+    auto* scHead = new QLabel(tr("📴  Modo Offline de RetroAchievements"), statusCard);
     scHead->setStyleSheet(QStringLiteral(
         "font-size: 15px; font-weight: 700; color: #f6f5f3; background: transparent;"));
     scLay->addWidget(scHead);
@@ -1331,18 +1331,18 @@ QWidget* WatermelonGameDialog::createOfflineTab()
             scLay->addLayout(row);
         };
 
-        makeStatRow(QStringLiteral("Desbloqueos pendientes:"),
+        makeStatRow(tr("Desbloqueos pendientes:"),
                     QStringLiteral("0"),        QColor(0x6f,0xbf,0x4a));
-        makeStatRow(QStringLiteral("Caché disponible:"),
+        makeStatRow(tr("Caché disponible:"),
                     QStringLiteral("No"),       QColor(0xe5,0x53,0x4b));
-        makeStatRow(QStringLiteral("Conexión actual:"),
+        makeStatRow(tr("Conexión actual:"),
                     QStringLiteral("Online"),   QColor(0x6f,0xbf,0x4a));
     }
     cLay->addWidget(statusCard);
 
     // Sync button
     if (raEnabled && loggedIn) {
-        btnSyncOffline = new QPushButton(QStringLiteral("  Comprobar y Sincronizar"), content);
+        btnSyncOffline = new QPushButton(tr("  Comprobar y Sincronizar"), content);
         btnSyncOffline->setIcon(QIcon(QStringLiteral(":/refresh-icon")));
         btnSyncOffline->setFixedHeight(44);
         btnSyncOffline->setStyleSheet(QStringLiteral(
@@ -1361,7 +1361,7 @@ QWidget* WatermelonGameDialog::createOfflineTab()
     iLay->setContentsMargins(18, 14, 18, 14);
     iLay->setSpacing(10);
 
-    auto* iHead = new QLabel(QStringLiteral("¿Cómo funciona el modo Offline?"), infoCard);
+    auto* iHead = new QLabel(tr("¿Cómo funciona el modo Offline?"), infoCard);
     iHead->setStyleSheet(QStringLiteral(
         "font-size: 13px; font-weight: 700; color: #f6f5f3; background: transparent;"));
     iLay->addWidget(iHead);
@@ -1421,13 +1421,13 @@ void WatermelonGameDialog::loadRAGameData()
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
-            showRAError(QStringLiteral("Error de conexión al consultar RetroAchievements:\n%1").arg(reply->errorString()));
+            showRAError(tr("Error de conexión al consultar RetroAchievements:\n%1").arg(reply->errorString()));
             return;
         }
 
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         if (!doc.isObject()) {
-            showRAError(QStringLiteral("Respuesta inesperada de RetroAchievements."));
+            showRAError(tr("Respuesta inesperada de RetroAchievements."));
             return;
         }
 
@@ -1510,19 +1510,19 @@ void WatermelonGameDialog::onGameInfoReplyFinished(QNetworkReply* reply)
 {
     reply->deleteLater();
     if (reply->error() != QNetworkReply::NoError) {
-        showRAError(QStringLiteral("Error al descargar los logros del juego:\n%1").arg(reply->errorString()));
+        showRAError(tr("Error al descargar los logros del juego:\n%1").arg(reply->errorString()));
         return;
     }
 
     QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
     if (!doc.isObject()) {
-        showRAError(QStringLiteral("Respuesta de datos inválida de RetroAchievements."));
+        showRAError(tr("Respuesta de datos inválida de RetroAchievements."));
         return;
     }
 
     QJsonObject root = doc.object();
     if (!root.value(QStringLiteral("Success")).toBool(true)) {
-        showRAError(root.value(QStringLiteral("Error")).toString(QStringLiteral("Error al obtener datos del juego.")));
+        showRAError(root.value(QStringLiteral("Error")).toString(tr("Error al obtener datos del juego.")));
         return;
     }
 
@@ -1631,12 +1631,12 @@ void WatermelonGameDialog::renderRAContent()
 
     if (!unlocked.isEmpty()) {
         insertBefore(makeSectionLabel(
-            QStringLiteral("Desbloqueados (%1)").arg(unlocked.size())));
+            tr("Desbloqueados (%1)").arg(unlocked.size())));
         insertBefore(buildAchievementCard(unlocked, true));
     }
     if (!locked.isEmpty()) {
         insertBefore(makeSectionLabel(
-            QStringLiteral("Bloqueados (%1)").arg(locked.size())));
+            tr("Bloqueados (%1)").arg(locked.size())));
         insertBefore(buildAchievementCard(locked, false));
     }
     if (raGame.achievements.isEmpty()) {
@@ -1674,7 +1674,7 @@ QFrame* WatermelonGameDialog::buildAchievementCard(const QList<RAGameAchievement
         rLay->setSpacing(12);
 
         // Badge container (Square)
-        auto* badgeLbl = new QLabel(isUnlocked ? QStringLiteral("⭐") : QStringLiteral("🔒"), row);
+        auto* badgeLbl = new QLabel(isUnlocked ? tr("⭐") : tr("🔒"), row);
         badgeLbl->setFixedSize(52, 52);
         badgeLbl->setAlignment(Qt::AlignCenter);
         badgeLbl->setStyleSheet(QStringLiteral(
@@ -1717,7 +1717,7 @@ QFrame* WatermelonGameDialog::buildAchievementCard(const QList<RAGameAchievement
             .arg(isUnlocked ? QStringLiteral("#ffd700") : QStringLiteral("#4a4858")));
         ptsLay->addWidget(ptsNum);
 
-        auto* ptsLbl = new QLabel(QStringLiteral("pts"), ptsCont);
+        auto* ptsLbl = new QLabel(tr("pts"), ptsCont);
         ptsLbl->setAlignment(Qt::AlignCenter);
         ptsLbl->setStyleSheet(QStringLiteral(
             "font-size: 9px; letter-spacing: 0.5px; color: #4a4858; background: transparent;"));
@@ -1726,7 +1726,7 @@ QFrame* WatermelonGameDialog::buildAchievementCard(const QList<RAGameAchievement
 
         // HC badge
         if (a.isHardcore) {
-            auto* hcBadge = new QLabel(QStringLiteral("HC"), row);
+            auto* hcBadge = new QLabel(tr("HC"), row);
             hcBadge->setFixedSize(26, 18);
             hcBadge->setAlignment(Qt::AlignCenter);
             hcBadge->setStyleSheet(QStringLiteral(
@@ -1894,10 +1894,10 @@ void WatermelonGameDialog::onRALoginClicked()
     QString user = raUserInput ? raUserInput->text().trimmed() : QString();
     QString pass = raPassInput ? raPassInput->text() : QString();
     if (user.isEmpty() || pass.isEmpty()) {
-        if (raLoginError) { raLoginError->setText(QStringLiteral("Introduce usuario y contraseña.")); raLoginError->show(); }
+        if (raLoginError) { raLoginError->setText(tr("Introduce usuario y contraseña.")); raLoginError->show(); }
         return;
     }
-    if (btnRALogin) { btnRALogin->setEnabled(false); btnRALogin->setText(QStringLiteral("Conectando…")); }
+    if (btnRALogin) { btnRALogin->setEnabled(false); btnRALogin->setText(tr("Conectando…")); }
     if (raLoginError) raLoginError->hide();
 
     QUrl url(QStringLiteral("https://retroachievements.org/dorequest.php?r=login&u=%1&p=%2")
@@ -1914,18 +1914,18 @@ void WatermelonGameDialog::onRALoginClicked()
 void WatermelonGameDialog::onLoginReplyFinished(QNetworkReply* reply)
 {
     reply->deleteLater();
-    if (btnRALogin) { btnRALogin->setEnabled(true); btnRALogin->setText(QStringLiteral("Iniciar sesión")); }
+    if (btnRALogin) { btnRALogin->setEnabled(true); btnRALogin->setText(tr("Iniciar sesión")); }
 
     if (reply->error() != QNetworkReply::NoError) {
-        if (raLoginError) { raLoginError->setText(QStringLiteral("Error de red: ") + reply->errorString()); raLoginError->show(); }
+        if (raLoginError) { raLoginError->setText(tr("Error de red: ") + reply->errorString()); raLoginError->show(); }
         return;
     }
 
     QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
     if (!obj[QStringLiteral("Success")].toBool()) {
         if (raLoginError) {
-            raLoginError->setText(obj[QStringLiteral("Error")].toString(
-                QStringLiteral("Usuario o contraseña incorrectos.")));
+            raLoginError->setText(obj[tr("Error")].toString(
+                tr("Usuario o contraseña incorrectos.")));
             raLoginError->show();
         }
         return;
@@ -1967,18 +1967,18 @@ void WatermelonGameDialog::onViewOnWebClicked()
 // ═══════════════════════════════════════════════════════════════════════════
 void WatermelonGameDialog::onSyncOfflineClicked()
 {
-    if (btnSyncOffline) { btnSyncOffline->setEnabled(false); btnSyncOffline->setText(QStringLiteral("Comprobando…")); }
+    if (btnSyncOffline) { btnSyncOffline->setEnabled(false); btnSyncOffline->setText(tr("Comprobando…")); }
     QTimer::singleShot(900, this, [this]() {
         if (btnSyncOffline) {
             btnSyncOffline->setEnabled(true);
-            btnSyncOffline->setText(QStringLiteral("  Comprobar y Sincronizar"));
+            btnSyncOffline->setText(tr("  Comprobar y Sincronizar"));
             btnSyncOffline->setIcon(QIcon(QStringLiteral(":/refresh-icon")));
         }
         if (offlineStatusLabel) offlineStatusLabel->setText(QStringLiteral(
             "🟢  <b style='color:#f6f5f3'>Sincronización al día.</b><br><br>"
             "Todos los registros locales están sincronizados con RetroAchievements."));
-        QMessageBox::information(this, QStringLiteral("Sincronización RetroAchievements"),
-            QStringLiteral("Sincronización completada. Todos los logros pendientes han sido enviados."));
+        QMessageBox::information(this, tr("Sincronización RetroAchievements"),
+            tr("Sincronización completada. Todos los logros pendientes han sido enviados."));
     });
 }
 
@@ -2032,8 +2032,8 @@ void WatermelonGameDialog::savePerGameConfig()
 void WatermelonGameDialog::onSaveConfigClicked()
 {
     savePerGameConfig();
-    QMessageBox::information(this, QStringLiteral("Configuración guardada"),
-        QStringLiteral("Configuración de '%1' guardada.").arg(romInfo.title));
+    QMessageBox::information(this, tr("Configuración guardada"),
+        tr("Configuración de '%1' guardada.").arg(romInfo.title));
 }
 
 void WatermelonGameDialog::onChooseShaderClicked()
@@ -2051,7 +2051,7 @@ void WatermelonGameDialog::onChooseShaderClicked()
 void WatermelonGameDialog::onClearShaderClicked()
 {
     currentShaderPath.clear();
-    if (shaderLabel) shaderLabel->setText(QStringLiteral("Global"));
+    if (shaderLabel) shaderLabel->setText(tr("Global"));
 }
 
 void WatermelonGameDialog::applyGameConfig(const QString& gameCode)

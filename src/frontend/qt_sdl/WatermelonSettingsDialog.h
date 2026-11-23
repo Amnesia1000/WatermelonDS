@@ -76,6 +76,7 @@ private:
     WatermelonSwitch* swMouseHide = nullptr;
     WatermelonSwitch* swDirectBoot = nullptr;
     QListWidget* listRomDirs = nullptr;
+    QComboBox* cbxUILanguage = nullptr;
 
     // System Page widgets
     QComboBox* cbxConsoleType = nullptr;

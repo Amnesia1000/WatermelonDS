@@ -247,31 +247,31 @@ void WatermelonLauncher::setupUI()
     btnOpen = new QPushButton(this);
     btnOpen->setProperty("primary", true);
     btnOpen->setCursor(Qt::PointingHandCursor);
-    btnOpen->setToolTip(QStringLiteral("Abrir un archivo ROM..."));
+    btnOpen->setToolTip(tr("Abrir un archivo ROM..."));
     connect(btnOpen, &QPushButton::clicked, this, &WatermelonLauncher::onOpenClicked);
     headerLayout->addWidget(btnOpen);
 
     btnShaders = new QPushButton(this);
     btnShaders->setCursor(Qt::PointingHandCursor);
-    btnShaders->setToolTip(QStringLiteral("Catálogo y configuración de shaders"));
+    btnShaders->setToolTip(tr("Catálogo y configuración de shaders"));
     connect(btnShaders, &QPushButton::clicked, this, &WatermelonLauncher::onShadersClicked);
     headerLayout->addWidget(btnShaders);
 
     btnRA = new QPushButton(this);
     btnRA->setCursor(Qt::PointingHandCursor);
-    btnRA->setToolTip(QStringLiteral("RetroAchievements - Resumen y perfil"));
+    btnRA->setToolTip(tr("RetroAchievements - Resumen y perfil"));
     connect(btnRA, &QPushButton::clicked, this, &WatermelonLauncher::onRetroAchievementsClicked);
     headerLayout->addWidget(btnRA);
 
     btnSettings = new QPushButton(this);
     btnSettings->setCursor(Qt::PointingHandCursor);
-    btnSettings->setToolTip(QStringLiteral("Ajustes generales, gráficos, emulación y controles"));
+    btnSettings->setToolTip(tr("Ajustes generales, gráficos, emulación y controles"));
     connect(btnSettings, &QPushButton::clicked, this, &WatermelonLauncher::onSettingsClicked);
     headerLayout->addWidget(btnSettings);
 
     btnAddDir = new QPushButton(this);
     btnAddDir->setCursor(Qt::PointingHandCursor);
-    btnAddDir->setToolTip(QStringLiteral("Añadir carpeta de juegos"));
+    btnAddDir->setToolTip(tr("Añadir carpeta de juegos"));
     connect(btnAddDir, &QPushButton::clicked, this, &WatermelonLauncher::onAddDirectoryClicked);
     headerLayout->addWidget(btnAddDir);
 
@@ -279,7 +279,7 @@ void WatermelonLauncher::setupUI()
     btnRefresh->setIcon(QIcon(QStringLiteral(":/refresh-icon")));
     btnRefresh->setIconSize(QSize(16, 16));
     btnRefresh->setCursor(Qt::PointingHandCursor);
-    btnRefresh->setToolTip(QStringLiteral("Actualizar biblioteca"));
+    btnRefresh->setToolTip(tr("Actualizar biblioteca"));
     btnRefresh->setFixedSize(34, 32);
     btnRefresh->setStyleSheet(QStringLiteral("QPushButton { padding: 4px; }"));
     connect(btnRefresh, &QPushButton::clicked, this, &WatermelonLauncher::onRefreshClicked);
@@ -307,7 +307,7 @@ void WatermelonLauncher::setupUI()
     recentSectionLayout->setContentsMargins(0, 0, 0, 0);
     recentSectionLayout->setSpacing(12);
 
-    auto* recentHeader = new QLabel(QStringLiteral("<span style='font-size:16px; font-weight:700; color:#6fbf4a;'>▶ Continuar Jugando</span>"), recentShelfSection);
+    auto* recentHeader = new QLabel(tr("<span style='font-size:16px; font-weight:700; color:#6fbf4a;'>▶ Continuar Jugando</span>"), recentShelfSection);
     recentHeader->setTextFormat(Qt::RichText);
     recentSectionLayout->addWidget(recentHeader);
 
@@ -336,7 +336,7 @@ void WatermelonLauncher::setupUI()
     gridSectionLayout->setContentsMargins(0, 0, 0, 0);
     gridSectionLayout->setSpacing(12);
 
-    auto* gridHeader = new QLabel(QStringLiteral("<span style='font-size:16px; font-weight:700; color:#f6f5f3;'>🎮 Biblioteca de Juegos</span>"), gridSection);
+    auto* gridHeader = new QLabel(tr("<span style='font-size:16px; font-weight:700; color:#f6f5f3;'>🎮 Biblioteca de Juegos</span>"), gridSection);
     gridHeader->setTextFormat(Qt::RichText);
     gridSectionLayout->addWidget(gridHeader);
 
@@ -532,31 +532,31 @@ void WatermelonLauncher::updateHeaderResponsiveness(int w)
 
     if (w >= 1080) {
         titleLogo->setText(QStringLiteral("🍉 <span style='font-size:20px; font-weight:800; color:#f6f5f3;'>Watermelon<span style='color:#6fbf4a;'>DS</span></span>"));
-        searchInput->setPlaceholderText(QStringLiteral("🔍 Buscar en tu biblioteca..."));
+        searchInput->setPlaceholderText(tr("🔍 Buscar en tu biblioteca..."));
         searchInput->setMaximumWidth(280);
-        btnOpen->setText(QStringLiteral("📁 Abrir ROM..."));
-        btnShaders->setText(QStringLiteral("🎨 Shaders"));
-        btnRA->setText(QStringLiteral("🏆 Logros"));
-        btnSettings->setText(QStringLiteral("⚙ Ajustes"));
-        btnAddDir->setText(QStringLiteral("➕ Carpeta"));
+        btnOpen->setText(tr("📁 Abrir ROM..."));
+        btnShaders->setText(tr("🎨 Shaders"));
+        btnRA->setText(tr("🏆 Logros"));
+        btnSettings->setText(tr("⚙ Ajustes"));
+        btnAddDir->setText(tr("➕ Carpeta"));
         btnAddDir->setVisible(true);
     } else if (w >= 880) {
         titleLogo->setText(QStringLiteral("🍉 <span style='font-size:18px; font-weight:800; color:#f6f5f3;'>Watermelon<span style='color:#6fbf4a;'>DS</span></span>"));
-        searchInput->setPlaceholderText(QStringLiteral("🔍 Buscar..."));
+        searchInput->setPlaceholderText(tr("🔍 Buscar..."));
         searchInput->setMaximumWidth(200);
-        btnOpen->setText(QStringLiteral("📁 Abrir"));
-        btnShaders->setText(QStringLiteral("🎨"));
-        btnRA->setText(QStringLiteral("🏆 Logros"));
-        btnSettings->setText(QStringLiteral("⚙ Ajustes"));
+        btnOpen->setText(tr("📁 Abrir"));
+        btnShaders->setText(tr("🎨"));
+        btnRA->setText(tr("🏆 Logros"));
+        btnSettings->setText(tr("⚙ Ajustes"));
         btnAddDir->setVisible(false);
     } else {
-        titleLogo->setText(QStringLiteral("🍉"));
-        searchInput->setPlaceholderText(QStringLiteral("🔍"));
+        titleLogo->setText(tr("🍉"));
+        searchInput->setPlaceholderText(tr("🔍"));
         searchInput->setMaximumWidth(140);
-        btnOpen->setText(QStringLiteral("📁"));
-        btnShaders->setText(QStringLiteral("🎨"));
-        btnRA->setText(QStringLiteral("🏆"));
-        btnSettings->setText(QStringLiteral("⚙"));
+        btnOpen->setText(tr("📁"));
+        btnShaders->setText(tr("🎨"));
+        btnRA->setText(tr("🏆"));
+        btnSettings->setText(tr("⚙"));
         btnAddDir->setVisible(false);
     }
 }
@@ -616,15 +616,15 @@ void WatermelonLauncher::showContextMenu(const WatermelonRom& rom, const QPoint&
         "}"
     ));
 
-    auto* actPlay = menu.addAction(QStringLiteral("▶  Iniciar juego"));
+    auto* actPlay = menu.addAction(tr("▶  Iniciar juego"));
     menu.addSeparator();
-    auto* actConfig = menu.addAction(QStringLiteral("⚙️  Configuración del juego..."));
-    auto* actCheats = menu.addAction(QStringLiteral("👾  Trucos (Cheats)..."));
-    auto* actRA = menu.addAction(QStringLiteral("🏆  RetroAchievements..."));
-    auto* actOffline = menu.addAction(QStringLiteral("📴  Modo Offline..."));
+    auto* actConfig = menu.addAction(tr("⚙️  Configuración del juego..."));
+    auto* actCheats = menu.addAction(tr("👾  Trucos (Cheats)..."));
+    auto* actRA = menu.addAction(tr("🏆  RetroAchievements..."));
+    auto* actOffline = menu.addAction(tr("📴  Modo Offline..."));
     menu.addSeparator();
-    auto* actOpenDir = menu.addAction(QStringLiteral("📁  Abrir carpeta del archivo"));
-    auto* actReloadCover = menu.addAction(QIcon(QStringLiteral(":/refresh-icon")), QStringLiteral("  Forzar recarga de carátula"));
+    auto* actOpenDir = menu.addAction(tr("📁  Abrir carpeta del archivo"));
+    auto* actReloadCover = menu.addAction(QIcon(QStringLiteral(":/refresh-icon")), tr("  Forzar recarga de carátula"));
 
     QAction* selected = menu.exec(globalPos);
     if (!selected) return;
@@ -1055,7 +1055,7 @@ void WatermelonLauncher::onOpenClicked()
 
 void WatermelonLauncher::onAddDirectoryClicked()
 {
-    QString dir = QFileDialog::getExistingDirectory(this, QStringLiteral("Seleccionar carpeta de juegos de Nintendo DS"));
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Seleccionar carpeta de juegos de Nintendo DS"));
     if (dir.isEmpty()) return;
 
     Config::Table globalCfg = Config::GetGlobalTable();

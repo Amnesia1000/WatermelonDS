@@ -10,6 +10,7 @@
 #include <QGridLayout>
 #include <QScrollArea>
 #include <QLabel>
+#include <QCoreApplication>
 #include <QPushButton>
 #include <QLineEdit>
 #include <QComboBox>
@@ -107,7 +108,7 @@ void WatermelonSwitch::nextCheckState()
 WatermelonSettingsDialog::WatermelonSettingsDialog(QWidget* parent, int initialCategory)
     : QDialog(parent)
 {
-    setWindowTitle(QStringLiteral("Configuración de WatermelonDS"));
+    setWindowTitle(tr("Configuración de WatermelonDS"));
     resize(940, 680);
     setMinimumSize(860, 600);
     setModal(true);
@@ -166,13 +167,13 @@ void WatermelonSettingsDialog::setupUI()
         "}"
     ));
 
-    auto* itemGeneral  = new QListWidgetItem(QStringLiteral("🛠  General"), sidebarList);
-    auto* itemSystem   = new QListWidgetItem(QStringLiteral("🪪  Sistema"), sidebarList);
-    auto* itemCpu      = new QListWidgetItem(QStringLiteral("⚙  CPU"), sidebarList);
-    auto* itemGraphics = new QListWidgetItem(QStringLiteral("🖥  Gráficos"), sidebarList);
-    auto* itemAudio    = new QListWidgetItem(QStringLiteral("🔊  Audio"), sidebarList);
-    auto* itemControls = new QListWidgetItem(QStringLiteral("🎮  Controles"), sidebarList);
-    auto* itemRA       = new QListWidgetItem(QStringLiteral("🏆  Logros"), sidebarList);
+    auto* itemGeneral  = new QListWidgetItem(tr("🛠  General"), sidebarList);
+    auto* itemSystem   = new QListWidgetItem(tr("🪪  Sistema"), sidebarList);
+    auto* itemCpu      = new QListWidgetItem(tr("⚙  CPU"), sidebarList);
+    auto* itemGraphics = new QListWidgetItem(tr("🖥  Gráficos"), sidebarList);
+    auto* itemAudio    = new QListWidgetItem(tr("🔊  Audio"), sidebarList);
+    auto* itemControls = new QListWidgetItem(tr("🎮  Controles"), sidebarList);
+    auto* itemRA       = new QListWidgetItem(tr("🏆  Logros"), sidebarList);
 
     Q_UNUSED(itemGeneral);
     Q_UNUSED(itemSystem);
@@ -212,7 +213,7 @@ void WatermelonSettingsDialog::setupUI()
     bottomLayout->setContentsMargins(16, 0, 16, 0);
     bottomLayout->setSpacing(12);
 
-    auto* btnReset = new QPushButton(QStringLiteral("Reiniciar todos los ajustes"), bottomBar);
+    auto* btnReset = new QPushButton(tr("Reiniciar todos los ajustes"), bottomBar);
     btnReset->setCursor(Qt::PointingHandCursor);
     btnReset->setStyleSheet(QStringLiteral(
         "QPushButton {"
@@ -224,13 +225,13 @@ void WatermelonSettingsDialog::setupUI()
     connect(btnReset, &QPushButton::clicked, this, &WatermelonSettingsDialog::onResetDefaultsClicked);
     bottomLayout->addWidget(btnReset);
 
-    auto* lblNote = new QLabel(QStringLiteral("Algunos ajustes solo están disponibles cuando no se estén ejecutando juegos."), bottomBar);
+    auto* lblNote = new QLabel(tr("Algunos ajustes solo están disponibles cuando no se estén ejecutando juegos."), bottomBar);
     lblNote->setStyleSheet(QStringLiteral("color: #63616e; font-size: 11px; margin-left: 6px; border: none; background: transparent;"));
     bottomLayout->addWidget(lblNote);
 
     bottomLayout->addStretch();
 
-    auto* btnOk = new QPushButton(QStringLiteral("OK"), bottomBar);
+    auto* btnOk = new QPushButton(tr("OK"), bottomBar);
     btnOk->setCursor(Qt::PointingHandCursor);
     btnOk->setFixedSize(88, 32);
     btnOk->setStyleSheet(QStringLiteral(
@@ -244,7 +245,7 @@ void WatermelonSettingsDialog::setupUI()
     connect(btnOk, &QPushButton::clicked, this, &WatermelonSettingsDialog::onOkClicked);
     bottomLayout->addWidget(btnOk);
 
-    auto* btnApply = new QPushButton(QStringLiteral("Apply"), bottomBar);
+    auto* btnApply = new QPushButton(tr("Apply"), bottomBar);
     btnApply->setCursor(Qt::PointingHandCursor);
     btnApply->setFixedSize(88, 32);
     btnApply->setStyleSheet(QStringLiteral(
@@ -257,7 +258,7 @@ void WatermelonSettingsDialog::setupUI()
     connect(btnApply, &QPushButton::clicked, this, &WatermelonSettingsDialog::onApplyClicked);
     bottomLayout->addWidget(btnApply);
 
-    auto* btnCancel = new QPushButton(QStringLiteral("Cancel"), bottomBar);
+    auto* btnCancel = new QPushButton(tr("Cancel"), bottomBar);
     btnCancel->setCursor(Qt::PointingHandCursor);
     btnCancel->setFixedSize(88, 32);
     btnCancel->setStyleSheet(QStringLiteral(
@@ -390,7 +391,7 @@ static QHBoxLayout* createPathRow(const QString& labelText, QLineEdit*& txtOut, 
     setupInput(txtOut);
     row->addWidget(txtOut, 1);
 
-    auto* btnBrowse = new QPushButton(QStringLiteral("Examinar..."), parent);
+    auto* btnBrowse = new QPushButton(QCoreApplication::translate("WatermelonSettingsDialog", "Examinar..."), parent);
     btnBrowse->setCursor(Qt::PointingHandCursor);
     setupInput(btnBrowse, 90);
     btnBrowse->setStyleSheet(QStringLiteral(
@@ -426,7 +427,7 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
     lay->setContentsMargins(24, 20, 24, 20);
     lay->setSpacing(18);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Comportamiento del Emulador"), content));
+    lay->addWidget(createSectionTitle(tr("Comportamiento del Emulador"), content));
 
     auto* cardGen = createCard(content);
     auto* cardGenLay = new QVBoxLayout(cardGen);
@@ -434,25 +435,25 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
     cardGenLay->setSpacing(12);
 
     swPauseLostFocus = new WatermelonSwitch(cardGen);
-    cardGenLay->addLayout(createSwitchRow(swPauseLostFocus, QStringLiteral("Pausar cuando la ventana no esté activa"), QStringLiteral("Detiene la emulación temporalmente si cambias a otra aplicación."), cardGen));
+    cardGenLay->addLayout(createSwitchRow(swPauseLostFocus, tr("Pausar cuando la ventana no esté activa"), tr("Detiene la emulación temporalmente si cambias a otra aplicación."), cardGen));
 
     swMouseHide = new WatermelonSwitch(cardGen);
-    cardGenLay->addLayout(createSwitchRow(swMouseHide, QStringLiteral("Ocultar el cursor por inactividad"), QStringLiteral("Oculta automáticamente la flecha del ratón mientras juegas."), cardGen));
+    cardGenLay->addLayout(createSwitchRow(swMouseHide, tr("Ocultar el cursor por inactividad"), tr("Oculta automáticamente la flecha del ratón mientras juegas."), cardGen));
 
     swDirectBoot = new WatermelonSwitch(cardGen);
-    cardGenLay->addLayout(createSwitchRow(swDirectBoot, QStringLiteral("Ejecución directa (Direct Boot)"), QStringLiteral("Inicia los juegos inmediatamente saltando el menú de inicio de la consola."), cardGen));
+    cardGenLay->addLayout(createSwitchRow(swDirectBoot, tr("Ejecución directa (Direct Boot)"), tr("Inicia los juegos inmediatamente saltando el menú de inicio de la consola."), cardGen));
 
     lay->addWidget(cardGen);
 
     // Contenido externo / Carpetas de ROMs
-    lay->addWidget(createSectionTitle(QStringLiteral("Contenido externo (Carpetas de ROMs)"), content));
+    lay->addWidget(createSectionTitle(tr("Contenido externo (Carpetas de ROMs)"), content));
 
     auto* cardDirs = createCard(content);
     auto* cardDirsLay = new QVBoxLayout(cardDirs);
     cardDirsLay->setContentsMargins(14, 14, 14, 14);
     cardDirsLay->setSpacing(10);
 
-    auto* descDirs = new QLabel(QStringLiteral("Añade directorios para buscar automáticamente juegos de Nintendo DS y carátulas:"), cardDirs);
+    auto* descDirs = new QLabel(tr("Añade directorios para buscar automáticamente juegos de Nintendo DS y carátulas:"), cardDirs);
     descDirs->setStyleSheet(QStringLiteral("color: #a09ea8; font-size: 12px; background: transparent; border: none;"));
     cardDirsLay->addWidget(descDirs);
 
@@ -471,7 +472,7 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
     auto* dirBtnsLay = new QHBoxLayout();
     dirBtnsLay->setSpacing(10);
 
-    auto* btnAddDir = new QPushButton(QStringLiteral("Añadir directorio"), cardDirs);
+    auto* btnAddDir = new QPushButton(tr("Añadir directorio"), cardDirs);
     btnAddDir->setCursor(Qt::PointingHandCursor);
     btnAddDir->setStyleSheet(QStringLiteral(
         "QPushButton {"
@@ -483,7 +484,7 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
     connect(btnAddDir, &QPushButton::clicked, this, &WatermelonSettingsDialog::onAddRomDirClicked);
     dirBtnsLay->addWidget(btnAddDir);
 
-    auto* btnRemDir = new QPushButton(QStringLiteral("Eliminar seleccionado"), cardDirs);
+    auto* btnRemDir = new QPushButton(tr("Eliminar seleccionado"), cardDirs);
     btnRemDir->setCursor(Qt::PointingHandCursor);
     btnRemDir->setStyleSheet(QStringLiteral(
         "QPushButton {"
@@ -498,6 +499,32 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
 
     cardDirsLay->addLayout(dirBtnsLay);
     lay->addWidget(cardDirs);
+
+    // Idioma de la interfaz
+    lay->addWidget(createSectionTitle(tr("Idioma de la Interfaz"), content));
+
+    auto* cardLang = createCard(content);
+    auto* langLay = new QVBoxLayout(cardLang);
+    langLay->setContentsMargins(14, 12, 14, 12);
+    langLay->setSpacing(8);
+
+    auto* langRow = new QHBoxLayout();
+    langRow->setSpacing(10);
+    langRow->addWidget(new QLabel(tr("Idioma de la interfaz:"), cardLang));
+    cbxUILanguage = new QComboBox(cardLang);
+    cbxUILanguage->addItem(tr("Automático (según el sistema)"), QString());
+    cbxUILanguage->addItem(QStringLiteral("Español"), QStringLiteral("es"));
+    cbxUILanguage->addItem(QStringLiteral("English"), QStringLiteral("en"));
+    setupInput(cbxUILanguage, 240);
+    langRow->addWidget(cbxUILanguage);
+    langRow->addStretch();
+    langLay->addLayout(langRow);
+
+    auto* langDesc = new QLabel(tr("Selecciona el idioma de los menús y diálogos. Los cambios se aplican al reiniciar el emulador."), cardLang);
+    langDesc->setStyleSheet(QStringLiteral("color: #8e8c99; font-size: 11px; background: transparent; border: none;"));
+    langDesc->setWordWrap(true);
+    langLay->addWidget(langDesc);
+    lay->addWidget(cardLang);
 
     lay->addStretch();
     scroll->setWidget(content);
@@ -520,7 +547,7 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
     lay->setContentsMargins(24, 20, 24, 20);
     lay->setSpacing(18);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Consola y Firmware"), content));
+    lay->addWidget(createSectionTitle(tr("Consola y Firmware"), content));
 
     auto* cardSys = createCard(content);
     auto* grid = new QGridLayout(cardSys);
@@ -528,25 +555,25 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
     grid->setHorizontalSpacing(16);
     grid->setVerticalSpacing(14);
 
-    grid->addWidget(new QLabel(QStringLiteral("Tipo de Consola:"), cardSys), 0, 0);
+    grid->addWidget(new QLabel(tr("Tipo de Consola:"), cardSys), 0, 0);
     cbxConsoleType = new QComboBox(cardSys);
-    cbxConsoleType->addItems({QStringLiteral("Nintendo DS (Original)"), QStringLiteral("Nintendo DSi")});
+    cbxConsoleType->addItems({tr("Nintendo DS (Original)"), tr("Nintendo DSi")});
     setupInput(cbxConsoleType);
     grid->addWidget(cbxConsoleType, 0, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Idioma del Sistema:"), cardSys), 1, 0);
+    grid->addWidget(new QLabel(tr("Idioma del Sistema:"), cardSys), 1, 0);
     cbxLanguage = new QComboBox(cardSys);
     cbxLanguage->addItems({QStringLiteral("Japonés"), QStringLiteral("Inglés"), QStringLiteral("Francés"), QStringLiteral("Alemán"), QStringLiteral("Italiano"), QStringLiteral("Español")});
     setupInput(cbxLanguage);
     grid->addWidget(cbxLanguage, 1, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Nombre de Usuario:"), cardSys), 2, 0);
+    grid->addWidget(new QLabel(tr("Nombre de Usuario:"), cardSys), 2, 0);
     txtUsername = new QLineEdit(cardSys);
     setupInput(txtUsername);
     grid->addWidget(txtUsername, 2, 1);
 
     // Color Favorito with Color Swatch Icons
-    grid->addWidget(new QLabel(QStringLiteral("Color Favorito:"), cardSys), 3, 0);
+    grid->addWidget(new QLabel(tr("Color Favorito:"), cardSys), 3, 0);
     cbxFavColour = new QComboBox(cardSys);
     setupInput(cbxFavColour);
 
@@ -587,7 +614,7 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
     grid->addWidget(cbxFavColour, 3, 1);
 
     // Cumpleaños: Day + Month (Properly proportioned!)
-    grid->addWidget(new QLabel(QStringLiteral("Cumpleaños:"), cardSys), 4, 0);
+    grid->addWidget(new QLabel(tr("Cumpleaños:"), cardSys), 4, 0);
     auto* bdayLay = new QHBoxLayout();
     bdayLay->setSpacing(10);
 
@@ -607,7 +634,7 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
     bdayLay->addStretch();
     grid->addLayout(bdayLay, 4, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Mensaje Personal:"), cardSys), 5, 0);
+    grid->addWidget(new QLabel(tr("Mensaje Personal:"), cardSys), 5, 0);
     txtMessage = new QLineEdit(cardSys);
     setupInput(txtMessage);
     grid->addWidget(txtMessage, 5, 1);
@@ -615,14 +642,14 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
     lay->addWidget(cardSys);
 
     // BIOS Files Section
-    lay->addWidget(createSectionTitle(QStringLiteral("Archivos de BIOS y Firmware"), content));
+    lay->addWidget(createSectionTitle(tr("Archivos de BIOS y Firmware"), content));
     auto* cardBios = createCard(content);
     auto* biosLay = new QVBoxLayout(cardBios);
     biosLay->setContentsMargins(14, 12, 14, 12);
     biosLay->setSpacing(12);
 
     swExternalBios = new WatermelonSwitch(cardBios);
-    biosLay->addLayout(createSwitchRow(swExternalBios, QStringLiteral("Usar BIOS/Firmware externo personalizado"), QStringLiteral("Permite seleccionar archivos binarios originales extraídos de tu Nintendo DS."), cardBios));
+    biosLay->addLayout(createSwitchRow(swExternalBios, tr("Usar BIOS/Firmware externo personalizado"), tr("Permite seleccionar archivos binarios originales extraídos de tu Nintendo DS."), cardBios));
 
     // Expandable container for BIOS paths
     biosFilesContainer = new QWidget(cardBios);
@@ -630,21 +657,21 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
     biosFilesLay->setContentsMargins(6, 6, 6, 6);
     biosFilesLay->setSpacing(10);
 
-    const QString binFilter = QStringLiteral("Archivos binarios (*.bin *.rom);;Todos los archivos (*.*)");
+    const QString binFilter = tr("Archivos binarios (*.bin *.rom);;Todos los archivos (*.*)");
 
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("BIOS ARM9 (DS):"), txtBios9, binFilter, biosFilesContainer));
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("BIOS ARM7 (DS):"), txtBios7, binFilter, biosFilesContainer));
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("Firmware (DS):"), txtFirmware, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("BIOS ARM9 (DS):"), txtBios9, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("BIOS ARM7 (DS):"), txtBios7, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("Firmware (DS):"), txtFirmware, binFilter, biosFilesContainer));
 
     // DSi paths
-    auto* lblDSiSep = new QLabel(QStringLiteral("<b>Archivos adicionales Nintendo DSi:</b>"), biosFilesContainer);
+    auto* lblDSiSep = new QLabel(tr("<b>Archivos adicionales Nintendo DSi:</b>"), biosFilesContainer);
     lblDSiSep->setStyleSheet(QStringLiteral("color: #a09ea8; margin-top: 6px;"));
     biosFilesLay->addWidget(lblDSiSep);
 
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("BIOS ARM9 (DSi):"), txtDSiBios9, binFilter, biosFilesContainer));
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("BIOS ARM7 (DSi):"), txtDSiBios7, binFilter, biosFilesContainer));
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("Firmware (DSi):"), txtDSiFirmware, binFilter, biosFilesContainer));
-    biosFilesLay->addLayout(createPathRow(QStringLiteral("NAND (DSi):"), txtDSiNAND, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("BIOS ARM9 (DSi):"), txtDSiBios9, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("BIOS ARM7 (DSi):"), txtDSiBios7, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("Firmware (DSi):"), txtDSiFirmware, binFilter, biosFilesContainer));
+    biosFilesLay->addLayout(createPathRow(tr("NAND (DSi):"), txtDSiNAND, binFilter, biosFilesContainer));
 
     biosLay->addWidget(biosFilesContainer);
 
@@ -673,7 +700,7 @@ QWidget* WatermelonSettingsDialog::createCpuPage()
     lay->setContentsMargins(24, 20, 24, 20);
     lay->setSpacing(18);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Recompilador JIT (Just-In-Time)"), content));
+    lay->addWidget(createSectionTitle(tr("Recompilador JIT (Just-In-Time)"), content));
 
     auto* cardJit = createCard(content);
     auto* jitLay = new QVBoxLayout(cardJit);
@@ -681,11 +708,11 @@ QWidget* WatermelonSettingsDialog::createCpuPage()
     jitLay->setSpacing(12);
 
     swJitEnable = new WatermelonSwitch(cardJit);
-    jitLay->addLayout(createSwitchRow(swJitEnable, QStringLiteral("Habilitar Recompilador JIT"), QStringLiteral("Aumenta drásticamente el rendimiento compilando código ARM al vuelo."), cardJit));
+    jitLay->addLayout(createSwitchRow(swJitEnable, tr("Habilitar Recompilador JIT"), tr("Aumenta drásticamente el rendimiento compilando código ARM al vuelo."), cardJit));
 
     auto* blockRow = new QHBoxLayout();
     blockRow->setContentsMargins(6, 4, 6, 4);
-    auto* lblBlock = new QLabel(QStringLiteral("Tamaño Máximo de Bloque JIT:"), cardJit);
+    auto* lblBlock = new QLabel(tr("Tamaño Máximo de Bloque JIT:"), cardJit);
     lblBlock->setStyleSheet(QStringLiteral("font-weight: 600; color: #f6f5f3;"));
     blockRow->addWidget(lblBlock);
     blockRow->addStretch();
@@ -697,13 +724,13 @@ QWidget* WatermelonSettingsDialog::createCpuPage()
     jitLay->addLayout(blockRow);
 
     swJitBranchOpt = new WatermelonSwitch(cardJit);
-    jitLay->addLayout(createSwitchRow(swJitBranchOpt, QStringLiteral("Optimizaciones de saltos (Branch Optimisations)"), QStringLiteral("Optimiza saltos condicionales en el código emulado."), cardJit));
+    jitLay->addLayout(createSwitchRow(swJitBranchOpt, tr("Optimizaciones de saltos (Branch Optimisations)"), tr("Optimiza saltos condicionales en el código emulado."), cardJit));
 
     swJitLiteralOpt = new WatermelonSwitch(cardJit);
-    jitLay->addLayout(createSwitchRow(swJitLiteralOpt, QStringLiteral("Optimizaciones de literales (Literal Optimisations)"), QStringLiteral("Optimiza constantes y literales en memoria."), cardJit));
+    jitLay->addLayout(createSwitchRow(swJitLiteralOpt, tr("Optimizaciones de literales (Literal Optimisations)"), tr("Optimiza constantes y literales en memoria."), cardJit));
 
     swJitFastMem = new WatermelonSwitch(cardJit);
-    jitLay->addLayout(createSwitchRow(swJitFastMem, QStringLiteral("Memoria Rápida (Fast Memory)"), QStringLiteral("Acelera los accesos a la memoria principal de la consola."), cardJit));
+    jitLay->addLayout(createSwitchRow(swJitFastMem, tr("Memoria Rápida (Fast Memory)"), tr("Acelera los accesos a la memoria principal de la consola."), cardJit));
 
     lay->addWidget(cardJit);
     lay->addStretch();
@@ -727,7 +754,7 @@ QWidget* WatermelonSettingsDialog::createGraphicsPage()
     lay->setContentsMargins(24, 20, 24, 20);
     lay->setSpacing(18);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Motor de Renderizado 3D"), content));
+    lay->addWidget(createSectionTitle(tr("Motor de Renderizado 3D"), content));
 
     auto* cardGfx = createCard(content);
     auto* grid = new QGridLayout(cardGfx);
@@ -735,41 +762,41 @@ QWidget* WatermelonSettingsDialog::createGraphicsPage()
     grid->setHorizontalSpacing(16);
     grid->setVerticalSpacing(14);
 
-    grid->addWidget(new QLabel(QStringLiteral("Renderizador 3D:"), cardGfx), 0, 0);
+    grid->addWidget(new QLabel(tr("Renderizador 3D:"), cardGfx), 0, 0);
     cbxRenderer3D = new QComboBox(cardGfx);
-    cbxRenderer3D->addItems({QStringLiteral("Software (Renderizado por CPU)"), QStringLiteral("OpenGL"), QStringLiteral("Vulkan (Experimental)")});
+    cbxRenderer3D->addItems({tr("Software (Renderizado por CPU)"), QStringLiteral("OpenGL"), tr("Vulkan (Experimental)")});
     setupInput(cbxRenderer3D);
     grid->addWidget(cbxRenderer3D, 0, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Multiplicador de Resolución:"), cardGfx), 1, 0);
+    grid->addWidget(new QLabel(tr("Multiplicador de Resolución:"), cardGfx), 1, 0);
     cbxScaleFactor = new QComboBox(cardGfx);
     cbxScaleFactor->addItems({
-        QStringLiteral("1x Nativo (256x192)"),
-        QStringLiteral("2x (512x384)"),
-        QStringLiteral("3x (768x576)"),
-        QStringLiteral("4x HD (1024x768)"),
-        QStringLiteral("5x (1280x960)"),
-        QStringLiteral("6x (1536x1152)"),
-        QStringLiteral("8x UHD (2048x1536)")
+        tr("1x Nativo (256x192)"),
+        tr("2x (512x384)"),
+        tr("3x (768x576)"),
+        tr("4x HD (1024x768)"),
+        tr("5x (1280x960)"),
+        tr("6x (1536x1152)"),
+        tr("8x UHD (2048x1536)")
     });
     setupInput(cbxScaleFactor);
     grid->addWidget(cbxScaleFactor, 1, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Shader de Postprocesado:"), cardGfx), 2, 0);
+    grid->addWidget(new QLabel(tr("Shader de Postprocesado:"), cardGfx), 2, 0);
     cbxShader = new QComboBox(cardGfx);
     cbxShader->addItems({
-        QStringLiteral("Ninguno (Directo)"),
-        QStringLiteral("CRT-Lottes (Efecto Retro)"),
-        QStringLiteral("LCD3x (Rejilla Nintendo DS)"),
-        QStringLiteral("ScaleFx (Suavizado HD)"),
-        QStringLiteral("xBRZ (Filtro Pixel Art)")
+        tr("Ninguno (Directo)"),
+        tr("CRT-Lottes (Efecto Retro)"),
+        tr("LCD3x (Rejilla Nintendo DS)"),
+        tr("ScaleFx (Suavizado HD)"),
+        tr("xBRZ (Filtro Pixel Art)")
     });
     setupInput(cbxShader);
     grid->addWidget(cbxShader, 2, 1);
 
     lay->addWidget(cardGfx);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Opciones de Pantalla y Polígonos"), content));
+    lay->addWidget(createSectionTitle(tr("Opciones de Pantalla y Polígonos"), content));
 
     auto* cardOpts = createCard(content);
     auto* optsLay = new QVBoxLayout(cardOpts);
@@ -777,16 +804,16 @@ QWidget* WatermelonSettingsDialog::createGraphicsPage()
     optsLay->setSpacing(12);
 
     swVSync = new WatermelonSwitch(cardOpts);
-    optsLay->addLayout(createSwitchRow(swVSync, QStringLiteral("Sincronización Vertical (VSync)"), QStringLiteral("Evita el desgarro de pantalla (tearing) sincronizando con la tasa de refresco del monitor."), cardOpts));
+    optsLay->addLayout(createSwitchRow(swVSync, tr("Sincronización Vertical (VSync)"), tr("Evita el desgarro de pantalla (tearing) sincronizando con la tasa de refresco del monitor."), cardOpts));
 
     swBetterPolygons = new WatermelonSwitch(cardOpts);
-    optsLay->addLayout(createSwitchRow(swBetterPolygons, QStringLiteral("Mejorar Polígonos (Better Polygons)"), QStringLiteral("Reduce artefactos de costuras y deformaciones poligonales en 3D."), cardOpts));
+    optsLay->addLayout(createSwitchRow(swBetterPolygons, tr("Mejorar Polígonos (Better Polygons)"), tr("Reduce artefactos de costuras y deformaciones poligonales en 3D."), cardOpts));
 
     swHiresCoords = new WatermelonSwitch(cardOpts);
-    optsLay->addLayout(createSwitchRow(swHiresCoords, QStringLiteral("Coordenadas de Alta Resolución"), QStringLiteral("Permite que los vértices utilicen precisión subpíxel al aumentar la resolución."), cardOpts));
+    optsLay->addLayout(createSwitchRow(swHiresCoords, tr("Coordenadas de Alta Resolución"), tr("Permite que los vértices utilicen precisión subpíxel al aumentar la resolución."), cardOpts));
 
     swSoftThreaded = new WatermelonSwitch(cardOpts);
-    optsLay->addLayout(createSwitchRow(swSoftThreaded, QStringLiteral("Renderizado por Software Multihilo"), QStringLiteral("Utiliza múltiples núcleos de CPU al usar el motor por Software."), cardOpts));
+    optsLay->addLayout(createSwitchRow(swSoftThreaded, tr("Renderizado por Software Multihilo"), tr("Utiliza múltiples núcleos de CPU al usar el motor por Software."), cardOpts));
 
     lay->addWidget(cardOpts);
     lay->addStretch();
@@ -810,7 +837,7 @@ QWidget* WatermelonSettingsDialog::createAudioPage()
     lay->setContentsMargins(24, 20, 24, 20);
     lay->setSpacing(18);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Salida de Sonido"), content));
+    lay->addWidget(createSectionTitle(tr("Salida de Sonido"), content));
 
     auto* cardAud = createCard(content);
     auto* grid = new QGridLayout(cardAud);
@@ -818,14 +845,14 @@ QWidget* WatermelonSettingsDialog::createAudioPage()
     grid->setHorizontalSpacing(16);
     grid->setVerticalSpacing(14);
 
-    grid->addWidget(new QLabel(QStringLiteral("Volumen Maestro:"), cardAud), 0, 0);
+    grid->addWidget(new QLabel(tr("Volumen Maestro:"), cardAud), 0, 0);
     auto* volLay = new QHBoxLayout();
     sldVolume = new QSlider(Qt::Horizontal, cardAud);
     sldVolume->setRange(0, 256);
     sldVolume->setValue(256);
     volLay->addWidget(sldVolume);
 
-    lblVolumeVal = new QLabel(QStringLiteral("100%"), cardAud);
+    lblVolumeVal = new QLabel(tr("100%"), cardAud);
     lblVolumeVal->setFixedWidth(46);
     lblVolumeVal->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
     volLay->addWidget(lblVolumeVal);
@@ -833,23 +860,23 @@ QWidget* WatermelonSettingsDialog::createAudioPage()
 
     connect(sldVolume, &QSlider::valueChanged, this, [this](int v) {
         int pct = qRound((v / 256.0) * 100.0);
-        lblVolumeVal->setText(QStringLiteral("%1%").arg(pct));
+        lblVolumeVal->setText(tr("%1%").arg(pct));
     });
 
-    grid->addWidget(new QLabel(QStringLiteral("Interpolación de Audio:"), cardAud), 1, 0);
+    grid->addWidget(new QLabel(tr("Interpolación de Audio:"), cardAud), 1, 0);
     cbxInterpolation = new QComboBox(cardAud);
     cbxInterpolation->addItems({
-        QStringLiteral("Ninguna (Sonido original DS)"),
-        QStringLiteral("Lineal (Suavizado rápido)"),
+        tr("Ninguna (Sonido original DS)"),
+        tr("Lineal (Suavizado rápido)"),
         QStringLiteral("Coseno"),
-        QStringLiteral("Cúbica (Mayor calidad)")
+        tr("Cúbica (Mayor calidad)")
     });
     setupInput(cbxInterpolation);
     grid->addWidget(cbxInterpolation, 1, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Profundidad de Bits:"), cardAud), 2, 0);
+    grid->addWidget(new QLabel(tr("Profundidad de Bits:"), cardAud), 2, 0);
     cbxBitDepth = new QComboBox(cardAud);
-    cbxBitDepth->addItems({QStringLiteral("16 bits (Estándar)")});
+    cbxBitDepth->addItems({tr("16 bits (Estándar)")});
     setupInput(cbxBitDepth);
     grid->addWidget(cbxBitDepth, 2, 1);
 
@@ -902,7 +929,7 @@ QWidget* WatermelonSettingsDialog::createControlsPage()
     } else {
         auto* cardFallback = createCard(content);
         auto* fbLay = new QVBoxLayout(cardFallback);
-        auto* lblErr = new QLabel(QStringLiteral("Abre el emulador con la ventana principal para configurar los controles."), cardFallback);
+        auto* lblErr = new QLabel(tr("Abre el emulador con la ventana principal para configurar los controles."), cardFallback);
         fbLay->addWidget(lblErr);
         lay->addWidget(cardFallback);
     }
@@ -928,7 +955,7 @@ QWidget* WatermelonSettingsDialog::createRAPage()
     lay->setContentsMargins(24, 20, 24, 20);
     lay->setSpacing(18);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("RetroAchievements - Opciones de Juego"), content));
+    lay->addWidget(createSectionTitle(tr("RetroAchievements - Opciones de Juego"), content));
 
     auto* cardRA = createCard(content);
     auto* raLay = new QVBoxLayout(cardRA);
@@ -936,26 +963,26 @@ QWidget* WatermelonSettingsDialog::createRAPage()
     raLay->setSpacing(12);
 
     swRAEnabled = new WatermelonSwitch(cardRA);
-    raLay->addLayout(createSwitchRow(swRAEnabled, QStringLiteral("Habilitar RetroAchievements"), QStringLiteral("Desbloquea logros mientras juegas y sincroniza tu perfil con retroachievements.org."), cardRA));
+    raLay->addLayout(createSwitchRow(swRAEnabled, tr("Habilitar RetroAchievements"), tr("Desbloquea logros mientras juegas y sincroniza tu perfil con retroachievements.org."), cardRA));
 
     swRAHardcore = new WatermelonSwitch(cardRA);
-    raLay->addLayout(createSwitchRow(swRAHardcore, QStringLiteral("Modo Hardcore"), QStringLiteral("Deshabilita trucos y guardados rápidos (Savestates) para ganar el doble de puntuación oficial."), cardRA));
+    raLay->addLayout(createSwitchRow(swRAHardcore, tr("Modo Hardcore"), tr("Deshabilita trucos y guardados rápidos (Savestates) para ganar el doble de puntuación oficial."), cardRA));
 
     swRARichPresence = new WatermelonSwitch(cardRA);
-    raLay->addLayout(createSwitchRow(swRARichPresence, QStringLiteral("Presencia Enriquecida (Rich Presence)"), QStringLiteral("Muestra en tiempo real en tu perfil qué nivel, zona o capítulo estás jugando."), cardRA));
+    raLay->addLayout(createSwitchRow(swRARichPresence, tr("Presencia Enriquecida (Rich Presence)"), tr("Muestra en tiempo real en tu perfil qué nivel, zona o capítulo estás jugando."), cardRA));
 
     swRASound = new WatermelonSwitch(cardRA);
-    raLay->addLayout(createSwitchRow(swRASound, QStringLiteral("Efectos de Sonido"), QStringLiteral("Reproduce el sonido clásico de logro desbloqueado al conseguir una insignia."), cardRA));
+    raLay->addLayout(createSwitchRow(swRASound, tr("Efectos de Sonido"), tr("Reproduce el sonido clásico de logro desbloqueado al conseguir una insignia."), cardRA));
 
     swRAUnofficial = new WatermelonSwitch(cardRA);
-    raLay->addLayout(createSwitchRow(swRAUnofficial, QStringLiteral("Logros No Oficiales (Unofficial)"), QStringLiteral("Permite cargar conjuntos de logros en fase de pruebas o desarrollo."), cardRA));
+    raLay->addLayout(createSwitchRow(swRAUnofficial, tr("Logros No Oficiales (Unofficial)"), tr("Permite cargar conjuntos de logros en fase de pruebas o desarrollo."), cardRA));
 
     swRAEncore = new WatermelonSwitch(cardRA);
-    raLay->addLayout(createSwitchRow(swRAEncore, QStringLiteral("Modo Encore"), QStringLiteral("Permite volver a desbloquear logros que ya habías completado anteriormente para practicar."), cardRA));
+    raLay->addLayout(createSwitchRow(swRAEncore, tr("Modo Encore"), tr("Permite volver a desbloquear logros que ya habías completado anteriormente para practicar."), cardRA));
 
     lay->addWidget(cardRA);
 
-    lay->addWidget(createSectionTitle(QStringLiteral("Cuenta y Credenciales"), content));
+    lay->addWidget(createSectionTitle(tr("Cuenta y Credenciales"), content));
 
     auto* cardAcc = createCard(content);
     auto* grid = new QGridLayout(cardAcc);
@@ -963,12 +990,12 @@ QWidget* WatermelonSettingsDialog::createRAPage()
     grid->setHorizontalSpacing(16);
     grid->setVerticalSpacing(14);
 
-    grid->addWidget(new QLabel(QStringLiteral("Usuario:"), cardAcc), 0, 0);
+    grid->addWidget(new QLabel(tr("Usuario:"), cardAcc), 0, 0);
     txtRAUser = new QLineEdit(cardAcc);
     setupInput(txtRAUser);
     grid->addWidget(txtRAUser, 0, 1);
 
-    grid->addWidget(new QLabel(QStringLiteral("Token de Conexión:"), cardAcc), 1, 0);
+    grid->addWidget(new QLabel(tr("Token de Conexión:"), cardAcc), 1, 0);
     txtRAToken = new QLineEdit(cardAcc);
     txtRAToken->setEchoMode(QLineEdit::Password);
     setupInput(txtRAToken);
@@ -996,6 +1023,7 @@ void WatermelonSettingsDialog::loadSettings()
     swPauseLostFocus->setChecked(globalCfg.GetBool("PauseLostFocus"));
     swMouseHide->setChecked(globalCfg.GetBool("Mouse.Hide"));
     swDirectBoot->setChecked(globalCfg.GetBool("Emu.DirectBoot"));
+    cbxUILanguage->setCurrentIndex(qMax(0, cbxUILanguage->findData(globalCfg.GetQString("UI.Language"))));
 
     listRomDirs->clear();
     QString dirsStr = globalCfg.GetQString("WatermelonRomDirs");
@@ -1063,7 +1091,7 @@ void WatermelonSettingsDialog::loadSettings()
     if (vol <= 0 && vol != 0) vol = 256;
     sldVolume->setValue(vol);
     int pct = qRound((vol / 256.0) * 100.0);
-    lblVolumeVal->setText(QStringLiteral("%1%").arg(pct));
+    lblVolumeVal->setText(tr("%1%").arg(pct));
     cbxInterpolation->setCurrentIndex(qBound(0, globalCfg.GetInt("Audio.Interpolation"), 3));
 
     // RetroAchievements
@@ -1079,9 +1107,9 @@ void WatermelonSettingsDialog::loadSettings()
     txtRAUser->setText(raUser);
     txtRAToken->setText(raTok);
     if (!raUser.isEmpty()) {
-        lblRAStatus->setText(QStringLiteral("Sesión activa con el usuario: %1").arg(raUser));
+        lblRAStatus->setText(tr("Sesión activa con el usuario: %1").arg(raUser));
     } else {
-        lblRAStatus->setText(QStringLiteral("No has iniciado sesión en RetroAchievements."));
+        lblRAStatus->setText(tr("No has iniciado sesión en RetroAchievements."));
         lblRAStatus->setStyleSheet(QStringLiteral("color: #a09ea8; font-size: 11px;"));
     }
 }
@@ -1094,6 +1122,10 @@ void WatermelonSettingsDialog::saveSettings()
     globalCfg.SetBool("PauseLostFocus", swPauseLostFocus->isChecked());
     globalCfg.SetBool("Mouse.Hide", swMouseHide->isChecked());
     globalCfg.SetBool("Emu.DirectBoot", swDirectBoot->isChecked());
+
+    const QString oldUILang = globalCfg.GetQString("UI.Language");
+    const QString newUILang = cbxUILanguage->currentData().toString();
+    globalCfg.SetQString("UI.Language", newUILang);
 
     QStringList dirList;
     for (int i = 0; i < listRomDirs->count(); ++i) {
@@ -1166,13 +1198,19 @@ void WatermelonSettingsDialog::saveSettings()
     globalCfg.SetQString("RA.Username", txtRAUser->text().trimmed());
     globalCfg.SetQString("RA.Token", txtRAToken->text().trimmed());
 
+    if (oldUILang != newUILang)
+    {
+        QMessageBox::information(this, tr("Idioma de la Interfaz"),
+                                 tr("El idioma de la interfaz se aplicará al reiniciar el emulador."));
+    }
+
     Config::Save();
     emit settingsSaved();
 }
 
 void WatermelonSettingsDialog::onAddRomDirClicked()
 {
-    QString dir = QFileDialog::getExistingDirectory(this, QStringLiteral("Seleccionar Carpeta de ROMs"));
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Seleccionar Carpeta de ROMs"));
     if (!dir.isEmpty()) {
         for (int i = 0; i < listRomDirs->count(); ++i) {
             if (listRomDirs->item(i)->text() == dir) return;
@@ -1193,8 +1231,8 @@ void WatermelonSettingsDialog::onResetDefaultsClicked()
 {
     auto res = QMessageBox::question(
         this,
-        QStringLiteral("Restablecer Ajustes"),
-        QStringLiteral("¿Estás seguro de que deseas restablecer todos los ajustes a sus valores por defecto?"),
+        tr("Restablecer Ajustes"),
+        tr("¿Estás seguro de que deseas restablecer todos los ajustes a sus valores por defecto?"),
         QMessageBox::Yes | QMessageBox::No
     );
     if (res == QMessageBox::Yes) {

@@ -30,7 +30,7 @@ constexpr const char* RA_MEDIA_HOST = "https://media.retroachievements.org/UserP
 WatermelonRADialog::WatermelonRADialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle(QStringLiteral("RetroAchievements — Resumen de Usuario"));
+    setWindowTitle(tr("RetroAchievements — Resumen de Usuario"));
     resize(520, 480);
     setMinimumSize(480, 420);
     setModal(true);
@@ -114,7 +114,7 @@ void WatermelonRADialog::setupUI()
     profileNameLabel->setStyleSheet(QStringLiteral("font-size: 20px; font-weight: 800; color: #f6f5f3; border: none; background: transparent;"));
     userDetailsLay->addWidget(profileNameLabel);
 
-    profileStatusBadge = new QLabel(QStringLiteral("🟢 Conectado"), userCard);
+    profileStatusBadge = new QLabel(tr("🟢 Conectado"), userCard);
     profileStatusBadge->setStyleSheet(QStringLiteral(
         "color: #6fbf4a; background: #1c2b18; border: 1px solid #2d4526; border-radius: 10px;"
         "font-size: 11px; font-weight: 700; padding: 2px 10px; max-width: 90px;"
@@ -140,7 +140,7 @@ void WatermelonRADialog::setupUI()
         lay->setSpacing(4);
         lay->setAlignment(Qt::AlignCenter);
 
-        lblValue = new QLabel(QStringLiteral("—"), box);
+        lblValue = new QLabel(tr("—"), box);
         lblValue->setAlignment(Qt::AlignCenter);
         lblValue->setStyleSheet(QStringLiteral("font-size: 18px; font-weight: 800; color: %1; border: none; background: transparent;").arg(color));
         lay->addWidget(lblValue);
@@ -153,9 +153,9 @@ void WatermelonRADialog::setupUI()
         return box;
     };
 
-    statsRow->addWidget(makeStatBox(QStringLiteral("Puntos Hardcore"), lblHardcorePoints, QStringLiteral("#ffd700")));
-    statsRow->addWidget(makeStatBox(QStringLiteral("Puntos Softcore"), lblSoftcorePoints, QStringLiteral("#6fbf4a")));
-    statsRow->addWidget(makeStatBox(QStringLiteral("Modo de Juego"), lblGameMode, QStringLiteral("#f6f5f3")));
+    statsRow->addWidget(makeStatBox(tr("Puntos Hardcore"), lblHardcorePoints, QStringLiteral("#ffd700")));
+    statsRow->addWidget(makeStatBox(tr("Puntos Softcore"), lblSoftcorePoints, QStringLiteral("#6fbf4a")));
+    statsRow->addWidget(makeStatBox(tr("Modo de Juego"), lblGameMode, QStringLiteral("#f6f5f3")));
 
     profMainLayout->addLayout(statsRow);
 
@@ -169,7 +169,7 @@ void WatermelonRADialog::setupUI()
     auto* actLay = new QVBoxLayout(actionsCard);
     actLay->setSpacing(8);
 
-    btnViewWebProfile = new QPushButton(QStringLiteral("🌐 Ver Perfil en RetroAchievements.org"), actionsCard);
+    btnViewWebProfile = new QPushButton(tr("🌐 Ver Perfil en RetroAchievements.org"), actionsCard);
     btnViewWebProfile->setCursor(Qt::PointingHandCursor);
     btnViewWebProfile->setFixedHeight(32);
     btnViewWebProfile->setStyleSheet(QStringLiteral(
@@ -185,7 +185,7 @@ void WatermelonRADialog::setupUI()
     auto* actBtnRow = new QHBoxLayout();
     actBtnRow->setSpacing(8);
 
-    btnOpenSettings = new QPushButton(QStringLiteral("⚙ Ajustes de Logros..."), actionsCard);
+    btnOpenSettings = new QPushButton(tr("⚙ Ajustes de Logros..."), actionsCard);
     btnOpenSettings->setCursor(Qt::PointingHandCursor);
     btnOpenSettings->setFixedHeight(30);
     btnOpenSettings->setStyleSheet(QStringLiteral(
@@ -198,7 +198,7 @@ void WatermelonRADialog::setupUI()
     connect(btnOpenSettings, &QPushButton::clicked, this, &WatermelonRADialog::onOpenSettingsClicked);
     actBtnRow->addWidget(btnOpenSettings);
 
-    btnLogout = new QPushButton(QStringLiteral("🚪 Cerrar Sesión"), actionsCard);
+    btnLogout = new QPushButton(tr("🚪 Cerrar Sesión"), actionsCard);
     btnLogout->setCursor(Qt::PointingHandCursor);
     btnLogout->setFixedHeight(30);
     btnLogout->setStyleSheet(QStringLiteral(
@@ -231,23 +231,23 @@ void WatermelonRADialog::setupUI()
     auto* cardLogLay = new QVBoxLayout(cardLog);
     cardLogLay->setSpacing(12);
 
-    auto* logTitle = new QLabel(QStringLiteral("Iniciar sesión con tu cuenta de RetroAchievements:"), cardLog);
+    auto* logTitle = new QLabel(tr("Iniciar sesión con tu cuenta de RetroAchievements:"), cardLog);
     logTitle->setStyleSheet(QStringLiteral("font-weight: 700; font-size: 13px; color: #f6f5f3; border: none; background: transparent;"));
     cardLogLay->addWidget(logTitle);
 
-    auto* logDesc = new QLabel(QStringLiteral("Conéctate para desbloquear logros, registrar tu puntuación y competir en clasificaciones globales."), cardLog);
+    auto* logDesc = new QLabel(tr("Conéctate para desbloquear logros, registrar tu puntuación y competir en clasificaciones globales."), cardLog);
     logDesc->setStyleSheet(QStringLiteral("color: #8e8c99; font-size: 11px; border: none; background: transparent;"));
     logDesc->setWordWrap(true);
     cardLogLay->addWidget(logDesc);
 
     userInput = new QLineEdit(cardLog);
-    userInput->setPlaceholderText(QStringLiteral("Nombre de usuario"));
+    userInput->setPlaceholderText(tr("Nombre de usuario"));
     userInput->setFixedHeight(30);
     userInput->setStyleSheet(QStringLiteral("background: #141318; border: 1px solid #2d2c38; border-radius: 6px; color: #f6f5f3; padding: 4px 10px;"));
     cardLogLay->addWidget(userInput);
 
     passInput = new QLineEdit(cardLog);
-    passInput->setPlaceholderText(QStringLiteral("Contraseña o Clave Web API"));
+    passInput->setPlaceholderText(tr("Contraseña o Clave Web API"));
     passInput->setEchoMode(QLineEdit::Password);
     passInput->setFixedHeight(30);
     passInput->setStyleSheet(QStringLiteral("background: #141318; border: 1px solid #2d2c38; border-radius: 6px; color: #f6f5f3; padding: 4px 10px;"));
@@ -255,7 +255,7 @@ void WatermelonRADialog::setupUI()
 
     auto* btnRow = new QHBoxLayout();
     btnRow->setSpacing(10);
-    btnLogin = new QPushButton(QStringLiteral("Iniciar Sesión"), cardLog);
+    btnLogin = new QPushButton(tr("Iniciar Sesión"), cardLog);
     btnLogin->setCursor(Qt::PointingHandCursor);
     btnLogin->setFixedHeight(32);
     btnLogin->setStyleSheet(QStringLiteral(
@@ -268,7 +268,7 @@ void WatermelonRADialog::setupUI()
     connect(btnLogin, &QPushButton::clicked, this, &WatermelonRADialog::onLoginClicked);
     btnRow->addWidget(btnLogin);
 
-    auto* btnRegister = new QPushButton(QStringLiteral("Crear Cuenta..."), cardLog);
+    auto* btnRegister = new QPushButton(tr("Crear Cuenta..."), cardLog);
     btnRegister->setCursor(Qt::PointingHandCursor);
     btnRegister->setFixedHeight(32);
     btnRegister->setStyleSheet(QStringLiteral(
@@ -304,7 +304,7 @@ void WatermelonRADialog::setupUI()
     // Bottom Close Button
     auto* bottomLayout = new QHBoxLayout();
     bottomLayout->addStretch();
-    auto* btnClose = new QPushButton(QStringLiteral("Cerrar"), this);
+    auto* btnClose = new QPushButton(tr("Cerrar"), this);
     btnClose->setCursor(Qt::PointingHandCursor);
     btnClose->setFixedSize(88, 30);
     btnClose->setStyleSheet(QStringLiteral(
@@ -379,7 +379,7 @@ void WatermelonRADialog::updateProfileView()
 
         if (lblHardcorePoints) lblHardcorePoints->setText(QString::number(userPoints));
         if (lblSoftcorePoints) lblSoftcorePoints->setText(QString::number(userSoftcorePoints));
-        if (lblGameMode) lblGameMode->setText(isHardcore() ? QStringLiteral("Hardcore 🛡") : QStringLiteral("Estándar"));
+        if (lblGameMode) lblGameMode->setText(isHardcore() ? tr("Hardcore 🛡") : tr("Estándar"));
 
         // Fetch UserPic
         QUrl avatarUrl(QStringLiteral("%1%2.png").arg(QString::fromUtf8(RA_MEDIA_HOST), user));
@@ -411,7 +411,7 @@ void WatermelonRADialog::onLoginClicked()
 
     if (user.isEmpty() || pass.isEmpty())
     {
-        loginErrorLabel->setText(QStringLiteral("Por favor introduce usuario y contraseña."));
+        loginErrorLabel->setText(tr("Por favor introduce usuario y contraseña."));
         loginErrorLabel->setVisible(true);
         return;
     }
@@ -450,7 +450,7 @@ void WatermelonRADialog::onLoginReplyFinished()
 
     if (reply->error() != QNetworkReply::NoError)
     {
-        loginErrorLabel->setText(QStringLiteral("Error de red: ") + reply->errorString());
+        loginErrorLabel->setText(tr("Error de red: ") + reply->errorString());
         loginErrorLabel->setVisible(true);
         return;
     }
@@ -458,7 +458,7 @@ void WatermelonRADialog::onLoginReplyFinished()
     QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
     if (!doc.isObject())
     {
-        loginErrorLabel->setText(QStringLiteral("Respuesta no válida del servidor."));
+        loginErrorLabel->setText(tr("Respuesta no válida del servidor."));
         loginErrorLabel->setVisible(true);
         return;
     }
@@ -467,7 +467,7 @@ void WatermelonRADialog::onLoginReplyFinished()
     if (!obj.value(QStringLiteral("Success")).toBool())
     {
         QString errorMsg = obj.value(QStringLiteral("Error")).toString();
-        loginErrorLabel->setText(errorMsg.isEmpty() ? QStringLiteral("Credenciales inválidas.") : errorMsg);
+        loginErrorLabel->setText(errorMsg.isEmpty() ? tr("Credenciales inválidas.") : errorMsg);
         loginErrorLabel->setVisible(true);
         return;
     }

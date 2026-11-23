@@ -14,5 +14,7 @@
 		<file alias="step-icon">step.svg</file>
 		<file alias="cheat-icon">cheat.svg</file>
 		<file alias="fullscreen-icon">fullscreen.svg</file>
+		<file alias="i18n/watermelon_es.qm">i18n/watermelon_es.qm</file>
+		<file alias="i18n/watermelon_en.qm">i18n/watermelon_en.qm</file>
 	</qresource>
 </RCC>

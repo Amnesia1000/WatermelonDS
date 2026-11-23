@@ -27,7 +27,7 @@ constexpr const char* SHADER_DOWNLOAD_URL = "https://buildbot.libretro.com/asset
 WatermelonShaderDialog::WatermelonShaderDialog(QWidget* parent)
     : QDialog(parent)
 {
-    setWindowTitle(QStringLiteral("Catálogo de Shaders - WatermelonDS"));
+    setWindowTitle(tr("Catálogo de Shaders - WatermelonDS"));
     resize(780, 560);
     setModal(true);
 
@@ -79,11 +79,11 @@ void WatermelonShaderDialog::setupUI()
     mainLayout->setSpacing(14);
 
     // Title Header
-    auto* titleLabel = new QLabel(QStringLiteral("🎨 <span style='font-size: 18px; font-weight: 700; color: #f6f5f3;'>Catálogo de Shaders RetroArch</span>"), this);
+    auto* titleLabel = new QLabel(tr("🎨 <span style='font-size: 18px; font-weight: 700; color: #f6f5f3;'>Catálogo de Shaders RetroArch</span>"), this);
     titleLabel->setTextFormat(Qt::RichText);
     mainLayout->addWidget(titleLabel);
 
-    auto* subLabel = new QLabel(QStringLiteral("Aplica filtros gráficos profesionales (CRT, LCD Game Boy/NDS, Scanlines, xBRZ, ScaleFX, etc.) para mejorar la imagen del juego."), this);
+    auto* subLabel = new QLabel(tr("Aplica filtros gráficos profesionales (CRT, LCD Game Boy/NDS, Scanlines, xBRZ, ScaleFX, etc.) para mejorar la imagen del juego."), this);
     subLabel->setWordWrap(true);
     subLabel->setStyleSheet(QStringLiteral("color: #a09da8; font-size: 12px; margin-bottom: 4px;"));
     mainLayout->addWidget(subLabel);
@@ -101,12 +101,12 @@ void WatermelonShaderDialog::setupUI()
     auto* bannerLayout = new QVBoxLayout(downloadBanner);
     bannerLayout->setSpacing(8);
 
-    statusLabel = new QLabel(QStringLiteral("📦 El paquete oficial de shaders Slang de RetroArch no está instalado en este sistema."), downloadBanner);
+    statusLabel = new QLabel(tr("📦 El paquete oficial de shaders Slang de RetroArch no está instalado en este sistema."), downloadBanner);
     statusLabel->setStyleSheet(QStringLiteral("color: #e5e4e8; font-weight: 600; border: none; background: transparent;"));
     bannerLayout->addWidget(statusLabel);
 
     auto* bannerBtnLayout = new QHBoxLayout();
-    btnDownload = new QPushButton(QStringLiteral("⬇️ Descargar Catálogo Oficial Slang (~25 MB)"), downloadBanner);
+    btnDownload = new QPushButton(tr("⬇️ Descargar Catálogo Oficial Slang (~25 MB)"), downloadBanner);
     btnDownload->setProperty("primary", true);
     btnDownload->setCursor(Qt::PointingHandCursor);
     connect(btnDownload, &QPushButton::clicked, this, &WatermelonShaderDialog::onDownloadClicked);
@@ -130,14 +130,14 @@ void WatermelonShaderDialog::setupUI()
 
     // Search / Filter Box
     filterInput = new QLineEdit(this);
-    filterInput->setPlaceholderText(QStringLiteral("🔍 Filtrar presets (ej: crt, lcd, xbrz, handheld, scanline)..."));
+    filterInput->setPlaceholderText(tr("🔍 Filtrar presets (ej: crt, lcd, xbrz, handheld, scanline)..."));
     filterInput->setClearButtonEnabled(true);
     connect(filterInput, &QLineEdit::textChanged, this, &WatermelonShaderDialog::onFilterChanged);
     mainLayout->addWidget(filterInput);
 
     // Tree / List of Shaders
     treeWidget = new QTreeWidget(this);
-    treeWidget->setHeaderLabels(QStringList() << QStringLiteral("Categoría / Preset") << QStringLiteral("Archivo"));
+    treeWidget->setHeaderLabels(QStringList() << tr("Categoría / Preset") << QStringLiteral("Archivo"));
     treeWidget->setColumnWidth(0, 360);
     treeWidget->setAlternatingRowColors(true);
     treeWidget->setStyleSheet(QStringLiteral(
@@ -162,18 +162,18 @@ void WatermelonShaderDialog::setupUI()
     activePresetLabel->setStyleSheet(QStringLiteral("color: #a09da8; font-size: 12px; font-weight: 500;"));
     bottomLayout->addWidget(activePresetLabel, 1);
 
-    btnDisable = new QPushButton(QStringLiteral("🚫 Sin Shader"), this);
-    btnDisable->setToolTip(QStringLiteral("Desactivar shader y volver a renderizado directo nativo"));
+    btnDisable = new QPushButton(tr("🚫 Sin Shader"), this);
+    btnDisable->setToolTip(tr("Desactivar shader y volver a renderizado directo nativo"));
     connect(btnDisable, &QPushButton::clicked, this, &WatermelonShaderDialog::onDisableClicked);
     bottomLayout->addWidget(btnDisable);
 
-    btnApply = new QPushButton(QStringLiteral("✨ Aplicar Shader"), this);
+    btnApply = new QPushButton(tr("✨ Aplicar Shader"), this);
     btnApply->setProperty("primary", true);
     btnApply->setEnabled(false);
     connect(btnApply, &QPushButton::clicked, this, &WatermelonShaderDialog::onApplyClicked);
     bottomLayout->addWidget(btnApply);
 
-    auto* btnClose = new QPushButton(QStringLiteral("Cerrar"), this);
+    auto* btnClose = new QPushButton(tr("Cerrar"), this);
     connect(btnClose, &QPushButton::clicked, this, &QDialog::accept);
     bottomLayout->addWidget(btnClose);
 
@@ -185,12 +185,12 @@ void WatermelonShaderDialog::updateActivePresetLabel()
     QString active = getActivePresetPath();
     if (active.isEmpty())
     {
-        activePresetLabel->setText(QStringLiteral("Preset activo: <span style='color: #a09da8;'>Ninguno (Renderizado directo)</span>"));
+        activePresetLabel->setText(tr("Preset activo: <span style='color: #a09da8;'>Ninguno (Renderizado directo)</span>"));
     }
     else
     {
         QFileInfo fi(active);
-        activePresetLabel->setText(QStringLiteral("Preset activo: <b style='color: #6fbf4a;'>%1</b>").arg(fi.fileName()));
+        activePresetLabel->setText(tr("Preset activo: <b style='color: #6fbf4a;'>%1</b>").arg(fi.fileName()));
     }
 }
 
@@ -304,8 +304,8 @@ void WatermelonShaderDialog::onApplyClicked()
     updateActivePresetLabel();
     emit shaderPresetChanged(currentSelectedPreset);
 
-    QMessageBox::information(this, QStringLiteral("Shader Aplicado"),
-        QStringLiteral("El shader se ha configurado como preset activo:\n%1").arg(QFileInfo(currentSelectedPreset).fileName()));
+    QMessageBox::information(this, tr("Shader Aplicado"),
+        tr("El shader se ha configurado como preset activo:\n%1").arg(QFileInfo(currentSelectedPreset).fileName()));
 }
 
 void WatermelonShaderDialog::onDisableClicked()
@@ -314,14 +314,14 @@ void WatermelonShaderDialog::onDisableClicked()
     updateActivePresetLabel();
     emit shaderPresetChanged(QString());
 
-    QMessageBox::information(this, QStringLiteral("Shaders Desactivados"),
-        QStringLiteral("Se han desactivado los shaders adicionales. El emulador usará el renderizado estándar."));
+    QMessageBox::information(this, tr("Shaders Desactivados"),
+        tr("Se han desactivado los shaders adicionales. El emulador usará el renderizado estándar."));
 }
 
 void WatermelonShaderDialog::onDownloadClicked()
 {
     btnDownload->setEnabled(false);
-    statusLabel->setText(QStringLiteral("Descargando catálogo de shaders desde libretro.com..."));
+    statusLabel->setText(tr("Descargando catálogo de shaders desde libretro.com..."));
     progressBar->setVisible(true);
     progressBar->setValue(0);
 
@@ -340,7 +340,7 @@ void WatermelonShaderDialog::onDownloadProgress(qint64 bytesReceived, qint64 byt
     {
         int percent = static_cast<int>((bytesReceived * 100) / bytesTotal);
         progressBar->setValue(percent);
-        statusLabel->setText(QStringLiteral("Descargando: %1 MB / %2 MB (%3%)")
+        statusLabel->setText(tr("Descargando: %1 MB / %2 MB (%3%)")
             .arg(bytesReceived / (1024.0 * 1024.0), 0, 'f', 1)
             .arg(bytesTotal / (1024.0 * 1024.0), 0, 'f', 1)
             .arg(percent));
@@ -355,7 +355,7 @@ void WatermelonShaderDialog::onDownloadFinished()
 
     if (reply->error() != QNetworkReply::NoError)
     {
-        statusLabel->setText(QStringLiteral("❌ Error al descargar: %1").arg(reply->errorString()));
+        statusLabel->setText(tr("❌ Error al descargar: %1").arg(reply->errorString()));
         btnDownload->setEnabled(true);
         progressBar->setVisible(false);
         return;
@@ -367,7 +367,7 @@ void WatermelonShaderDialog::onDownloadFinished()
     QFile file(zipPath);
     if (!file.open(QIODevice::WriteOnly))
     {
-        statusLabel->setText(QStringLiteral("❌ No se pudo guardar el archivo zip temporal."));
+        statusLabel->setText(tr("❌ No se pudo guardar el archivo zip temporal."));
         btnDownload->setEnabled(true);
         progressBar->setVisible(false);
         return;
@@ -375,7 +375,7 @@ void WatermelonShaderDialog::onDownloadFinished()
     file.write(data);
     file.close();
 
-    statusLabel->setText(QStringLiteral("Extrayendo shaders..."));
+    statusLabel->setText(tr("Extrayendo shaders..."));
     progressBar->setValue(100);
 
     // Extract using unzip
@@ -383,7 +383,7 @@ void WatermelonShaderDialog::onDownloadFinished()
     process.start(QStringLiteral("unzip"), QStringList() << QStringLiteral("-q") << QStringLiteral("-o") << zipPath << QStringLiteral("-d") << shadersPath);
     if (!process.waitForFinished(60000))
     {
-        statusLabel->setText(QStringLiteral("❌ Tiempo de espera agotado al extraer los shaders."));
+        statusLabel->setText(tr("❌ Tiempo de espera agotado al extraer los shaders."));
         btnDownload->setEnabled(true);
         return;
     }
@@ -395,6 +395,6 @@ void WatermelonShaderDialog::onDownloadFinished()
     loadShaderCategories();
     updateActivePresetLabel();
 
-    QMessageBox::information(this, QStringLiteral("Instalación Completa"),
-        QStringLiteral("¡El catálogo de shaders RetroArch se ha instalado correctamente!"));
+    QMessageBox::information(this, tr("Instalación Completa"),
+        tr("¡El catálogo de shaders RetroArch se ha instalado correctamente!"));
 }

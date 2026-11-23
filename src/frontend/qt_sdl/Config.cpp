@@ -117,7 +117,8 @@ DefaultList<std::string> DefaultStrings =
 {
     {"DLDI.ImagePath",                  "dldi.bin"},
     {"DSi.SD.ImagePath",                "dsisd.bin"},
-    {"Instance*.Firmware.Username",     "melonDS"}
+    {"Instance*.Firmware.Username",     "melonDS"},
+    {"UI.Language",                     ""}
 };
 
 DefaultList<double> DefaultDoubles =
@@ -308,6 +309,7 @@ LegacyEntry LegacyFile[] =
     {"MouseHideSeconds", 0, "Mouse.HideSeconds", false},
     {"PauseLostFocus",   1, "PauseLostFocus", false},
     {"UITheme",          2, "UITheme", false},
+    {"UILanguage",       2, "UI.Language", false},
 
     {"RTCOffset",       3, "RTC.Offset", true},
 

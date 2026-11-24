@@ -163,8 +163,9 @@ void WatermelonFloatingBar::setCompactMode(bool compact)
 
 void WatermelonFloatingBar::updateForWindowWidth(int windowWidth)
 {
-    // Threshold: if window is less than 720px wide, use compact icons-only mode
-    setCompactMode(windowWidth < 720);
+    // Threshold: if window is less than 860px wide, use compact icons-only mode
+    // so the full-text bar never clips on narrower windows.
+    setCompactMode(windowWidth < 860);
 }
 
 void WatermelonFloatingBar::refreshButtonTexts()

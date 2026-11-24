@@ -2733,6 +2733,7 @@ void MainWindow::showLauncher()
         connect(launcher, &WatermelonLauncher::settingsCategoryRequested, this, &MainWindow::onOpenUnifiedSettingsCategory);
     }
 
+    setMinimumSize(740, 480);
     setCentralWidget(launcher);
     launcher->show();
     launcher->refresh();
@@ -2750,6 +2751,8 @@ void MainWindow::showEmulator()
 
     if (panel)
     {
+        QSize minSize = panel->screenGetMinSize(1);
+        setMinimumSize(minSize);
         setCentralWidget(panel);
         panel->show();
         panel->raise();

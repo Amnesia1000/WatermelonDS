@@ -90,6 +90,7 @@ private:
     QLineEdit* txtSaveFilePath = nullptr;
     QLineEdit* txtSavestatePath = nullptr;
     QLineEdit* txtCheatFilePath = nullptr;
+    QLineEdit* txtCheatDbPath = nullptr;
     QSpinBox* spnMouseHideSeconds = nullptr;
     QDoubleSpinBox* spnTargetFPS = nullptr;
     QDoubleSpinBox* spnFastForwardFPS = nullptr;

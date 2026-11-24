@@ -840,6 +840,12 @@ void WatermelonGameDialog::loadCheatsForGame()
         cheatFilePath = fi.dir().filePath(baseName + QStringLiteral(".mch"));
     }
     gameCheatFile = std::make_unique<melonDS::ARCodeFile>(cheatFilePath.toStdString());
+    if (gameCheatFile->RootCat.Children.empty()) {
+        QString dbPath = globalCfg.GetQString("WatermelonCheatDbPath").trimmed();
+        if (!dbPath.isEmpty() && QFileInfo::exists(dbPath)) {
+            importFromCheatDatabase(dbPath, true);
+        }
+    }
 }
 
 QWidget* WatermelonGameDialog::createCheatsTab()
@@ -1150,22 +1156,16 @@ void WatermelonGameDialog::onAddCheatClicked()
     }
 }
 
-void WatermelonGameDialog::onImportCheatDbClicked()
+bool WatermelonGameDialog::importFromCheatDatabase(const QString& dbPath, bool silent)
 {
-    if (!gameCheatFile) return;
+    if (!gameCheatFile || dbPath.isEmpty()) return false;
 
-    QString file = QFileDialog::getOpenFileName(
-        this,
-        tr("Seleccionar base de datos de trucos (usrcheat.dat)"),
-        QString(),
-        tr("Bases de datos de trucos (*.dat);;Todos los archivos (*.*)")
-    );
-    if (file.isEmpty()) return;
-
-    melonDS::ARDatabaseDAT db(file.toStdString());
+    melonDS::ARDatabaseDAT db(dbPath.toStdString());
     if (db.Error) {
-        QMessageBox::critical(this, tr("Error"), tr("No se pudo abrir la base de datos de trucos seleccionada."));
-        return;
+        if (!silent) {
+            QMessageBox::critical(this, tr("Error"), tr("No se pudo abrir la base de datos de trucos seleccionada."));
+        }
+        return false;
     }
 
     melonDS::u32 codeU32 = 0;
@@ -1178,25 +1178,50 @@ void WatermelonGameDialog::onImportCheatDbClicked()
 
     auto entries = db.GetEntriesByGameCode(codeU32);
     if (entries.empty()) {
-        QMessageBox::warning(
-            this,
-            tr("Sin trucos encontrados"),
-            tr("No se encontraron trucos para el código de juego %1 en esta base de datos.").arg(romInfo.gameCode)
-        );
-        return;
+        if (!silent) {
+            QMessageBox::warning(
+                this,
+                tr("Sin trucos encontrados"),
+                tr("No se encontraron trucos para el código de juego %1 en esta base de datos.").arg(romInfo.gameCode)
+            );
+        }
+        return false;
     }
 
     melonDS::ARCodeEnableMap map;
     gameCheatFile->Import(entries[0], map, false);
     gameCheatFile->Save();
 
-    populateCheatTree();
+    if (treeCheats) {
+        populateCheatTree();
+    }
 
-    QMessageBox::information(
+    if (!silent) {
+        QMessageBox::information(
+            this,
+            tr("Trucos importados"),
+            tr("Se importaron exitosamente los trucos para '%1' desde la base de datos.").arg(romInfo.title)
+        );
+    }
+    return true;
+}
+
+void WatermelonGameDialog::onImportCheatDbClicked()
+{
+    if (!gameCheatFile) return;
+
+    Config::Table globalCfg = Config::GetGlobalTable();
+    QString defaultDb = globalCfg.GetQString("WatermelonCheatDbPath").trimmed();
+
+    QString file = QFileDialog::getOpenFileName(
         this,
-        tr("Trucos importados"),
-        tr("Se importaron exitosamente los trucos para '%1' desde la base de datos.").arg(romInfo.title)
+        tr("Seleccionar base de datos de trucos (usrcheat.dat)"),
+        defaultDb,
+        tr("Bases de datos de trucos (*.dat);;Todos los archivos (*.*)")
     );
+    if (file.isEmpty()) return;
+
+    importFromCheatDatabase(file, false);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

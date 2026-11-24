@@ -116,6 +116,7 @@ private:
     void loadCheatsForGame();
     void populateCheatTree();
     void onAddCheatClicked();
+    bool importFromCheatDatabase(const QString& dbPath, bool silent);
     void onImportCheatDbClicked();
     void onCheatItemChanged(QTreeWidgetItem* item, int column);
 

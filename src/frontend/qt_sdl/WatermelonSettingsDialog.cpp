@@ -447,6 +447,39 @@ static QHBoxLayout* createPathRow(const QString& labelText, QLineEdit*& txtOut, 
     return row;
 }
 
+static QHBoxLayout* createFilePickerRow(const QString& labelText, QLineEdit*& txtOut, const QString& filter, QWidget* parent)
+{
+    auto* row = new QHBoxLayout();
+    row->setSpacing(8);
+
+    auto* lbl = new QLabel(labelText, parent);
+    lbl->setFixedWidth(120);
+    row->addWidget(lbl);
+
+    txtOut = new QLineEdit(parent);
+    setupInput(txtOut);
+    row->addWidget(txtOut, 1);
+
+    auto* btnBrowse = new QPushButton(QCoreApplication::translate("WatermelonSettingsDialog", "Examinar..."), parent);
+    btnBrowse->setCursor(Qt::PointingHandCursor);
+    setupInput(btnBrowse, 90);
+    btnBrowse->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        "  background: #252430; border: 1px solid #363444; border-radius: 6px;"
+        "  color: #f6f5f3; padding: 2px 10px; font-size: 12px;"
+        "}"
+        "QPushButton:hover { background: #31303e; border-color: #ff5477; color: #ff5477; }"
+    ));
+    QLineEdit* targetEdit = txtOut;
+    QObject::connect(btnBrowse, &QPushButton::clicked, parent, [parent, targetEdit, labelText, filter]() {
+        QString f = QFileDialog::getOpenFileName(parent, labelText, targetEdit->text(), filter);
+        if (!f.isEmpty()) targetEdit->setText(f);
+    });
+    row->addWidget(btnBrowse);
+
+    return row;
+}
+
 static QHBoxLayout* createFolderRow(const QString& labelText, QLineEdit*& txtOut, QWidget* parent)
 {
     auto* row = new QHBoxLayout();
@@ -594,6 +627,8 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
     pathsLay->addLayout(createFolderRow(tr("Partidas guardadas:"), txtSaveFilePath, cardPaths));
     pathsLay->addLayout(createFolderRow(tr("Estados de guardado:"), txtSavestatePath, cardPaths));
     pathsLay->addLayout(createFolderRow(tr("Archivos de trucos:"), txtCheatFilePath, cardPaths));
+    pathsLay->addLayout(createFilePickerRow(tr("DB de trucos (.dat):"), txtCheatDbPath, tr("Bases de datos de trucos (*.dat);;Todos los archivos (*)"), cardPaths));
+    txtCheatDbPath->setPlaceholderText(tr("Ruta global a usrcheat.dat (importación automática)"));
 
     swSavestateRelocSRAM = new WatermelonSwitch(cardPaths);
     pathsLay->addLayout(createSwitchRow(swSavestateRelocSRAM,
@@ -1814,6 +1849,7 @@ void WatermelonSettingsDialog::loadSettings()
     txtSaveFilePath->setText(localCfg0.GetQString("SaveFilePath"));
     txtSavestatePath->setText(localCfg0.GetQString("SavestatePath"));
     txtCheatFilePath->setText(localCfg0.GetQString("CheatFilePath"));
+    txtCheatDbPath->setText(globalCfg.GetQString("WatermelonCheatDbPath"));
     swSavestateRelocSRAM->setChecked(globalCfg.GetBool("Savestate.RelocSRAM"));
 
     // System
@@ -2034,6 +2070,7 @@ void WatermelonSettingsDialog::saveSettings()
     localCfg0.SetQString("SaveFilePath", txtSaveFilePath->text().trimmed());
     localCfg0.SetQString("SavestatePath", txtSavestatePath->text().trimmed());
     localCfg0.SetQString("CheatFilePath", txtCheatFilePath->text().trimmed());
+    globalCfg.SetQString("WatermelonCheatDbPath", txtCheatDbPath->text().trimmed());
     globalCfg.SetBool("Savestate.RelocSRAM", swSavestateRelocSRAM->isChecked());
 
     // System
@@ -2333,6 +2370,7 @@ void WatermelonSettingsDialog::onResetDefaultsClicked()
         txtSaveFilePath->clear();
         txtSavestatePath->clear();
         txtCheatFilePath->clear();
+        txtCheatDbPath->clear();
     }
 }
 

@@ -706,12 +706,12 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
         resize(1024, 720);
     }
     setMinimumSize(740, 480);
-    show();
 
     panel = nullptr;
     launcher = nullptr;
     floatingBar = nullptr;
-    createScreenPanel();
+    if (windowID != 0 || (emuThread && emuThread->emuIsActive()))
+        createScreenPanel();
 
     if (windowID == 0)
     {
@@ -730,7 +730,6 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
             if (scr.filter >= 0) windowCfg.SetBool("ScreenFilter", scr.filter == 1);
 
             applyScreenConfig();
-            if (scr.sizeFactor > 0) applyScreenSizeFactor(scr.sizeFactor);
 
             QStringList gbaFiles;
             if (!gba.cartPath.isEmpty() && QFile::exists(gba.cartPath))
@@ -738,6 +737,8 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
 
             if (!preloadROMs({path}, gbaFiles, true))
                 return;
+
+            if (scr.sizeFactor > 0) applyScreenSizeFactor(scr.sizeFactor);
 
             if (gba.addon > 0)
             {
@@ -776,6 +777,7 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
             showEmulator();
         }
     }
+    show();
 
     if (hasMenu)
     {
@@ -1003,7 +1005,7 @@ void MainWindow::createScreenPanel()
 
 GL::Context* MainWindow::getOGLContext()
 {
-    if (!hasOGL) return nullptr;
+    if (!hasOGL || !panel) return nullptr;
 
     ScreenPanelGL* glpanel = static_cast<ScreenPanelGL*>(panel);
     return glpanel->getContext();
@@ -1011,7 +1013,7 @@ GL::Context* MainWindow::getOGLContext()
 
 void MainWindow::initOpenGL()
 {
-    if (!hasOGL) return;
+    if (!hasOGL || !panel) return;
 
     ScreenPanelGL* glpanel = static_cast<ScreenPanelGL*>(panel);
     return glpanel->initOpenGL();
@@ -1019,7 +1021,7 @@ void MainWindow::initOpenGL()
 
 void MainWindow::deinitOpenGL()
 {
-    if (!hasOGL) return;
+    if (!hasOGL || !panel) return;
 
     ScreenPanelGL* glpanel = static_cast<ScreenPanelGL*>(panel);
     return glpanel->deinitOpenGL();
@@ -2674,8 +2676,10 @@ void MainWindow::showLauncher()
     takeCentralWidget();
     if (panel)
     {
-        panel->setParent(this);
-        panel->hide();
+        if (hasOGL && emuThread)
+            emuThread->deinitContext(windowID);
+        delete panel;
+        panel = nullptr;
     }
 
     if (!launcher)
@@ -2695,7 +2699,6 @@ void MainWindow::showLauncher()
             if (scr.filter >= 0) windowCfg.SetBool("ScreenFilter", scr.filter == 1);
 
             applyScreenConfig();
-            if (scr.sizeFactor > 0) applyScreenSizeFactor(scr.sizeFactor);
 
             QStringList gbaFiles;
             if (!gba.cartPath.isEmpty() && QFile::exists(gba.cartPath))
@@ -2703,6 +2706,8 @@ void MainWindow::showLauncher()
 
             if (!preloadROMs({path}, gbaFiles, true))
                 return;
+
+            if (scr.sizeFactor > 0) applyScreenSizeFactor(scr.sizeFactor);
 
             if (gba.addon > 0)
             {
@@ -2733,7 +2738,8 @@ void MainWindow::showLauncher()
         connect(launcher, &WatermelonLauncher::settingsCategoryRequested, this, &MainWindow::onOpenUnifiedSettingsCategory);
     }
 
-    setMinimumSize(740, 480);
+    if (minimumSize() != QSize(740, 480))
+        setMinimumSize(740, 480);
     setCentralWidget(launcher);
     launcher->show();
     launcher->refresh();
@@ -2749,10 +2755,18 @@ void MainWindow::showEmulator()
         launcher = nullptr;
     }
 
+    if (!panel)
+    {
+        createScreenPanel();
+        applyScreenConfig();
+        glContextDirty = false;
+    }
+
     if (panel)
     {
         QSize minSize = panel->screenGetMinSize(1);
-        setMinimumSize(minSize);
+        if (minimumSize() != minSize)
+            setMinimumSize(minSize);
         setCentralWidget(panel);
         panel->show();
         panel->raise();

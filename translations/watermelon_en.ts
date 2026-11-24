@@ -1120,7 +1120,7 @@ Check your connection or credentials.</translation>
     <message>
         <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="742"/>
         <source>🖼️  Pantalla y vistas...</source>
-        <translation>🖼️  Display &amp; Views...</translation>
+        <translation>🖼️  Display &amp;&amp; Views...</translation>
     </message>
     <message>
         <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="743"/>

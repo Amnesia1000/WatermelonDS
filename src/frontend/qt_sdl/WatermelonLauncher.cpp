@@ -223,8 +223,6 @@ WatermelonLauncher::WatermelonLauncher(QWidget* parent)
 {
     networkManager = new QNetworkAccessManager(this);
     setupUI();
-    // Defer refresh so the window can appear first
-    QTimer::singleShot(100, this, &WatermelonLauncher::refresh);
 }
 
 WatermelonLauncher::~WatermelonLauncher() = default;
@@ -664,7 +662,13 @@ void WatermelonLauncher::resizeEvent(QResizeEvent* event)
     updateHeaderResponsiveness(width());
     if (!allRoms.isEmpty() && gridContainer && gridContainer->isVisible())
     {
-        renderGames();
+        if (!renderDebounceTimer)
+        {
+            renderDebounceTimer = new QTimer(this);
+            renderDebounceTimer->setSingleShot(true);
+            connect(renderDebounceTimer, &QTimer::timeout, this, &WatermelonLauncher::renderGames);
+        }
+        renderDebounceTimer->start(40);
     }
 }
 

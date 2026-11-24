@@ -1220,7 +1220,10 @@ QWidget* WatermelonSettingsDialog::createGraphicsPage()
 
     grid->addWidget(new QLabel(tr("Renderizador 3D:"), cardGfx), 0, 0);
     cbxRenderer3D = new QComboBox(cardGfx);
-    cbxRenderer3D->addItems({tr("Software (Renderizado por CPU)"), QStringLiteral("OpenGL"), tr("Vulkan (Experimental)")});
+    cbxRenderer3D->addItem(tr("Software (Renderizado por CPU)"), 0);
+    cbxRenderer3D->addItem(QStringLiteral("OpenGL"), 1);
+    cbxRenderer3D->addItem(QStringLiteral("OpenGL Compute"), 2);
+    cbxRenderer3D->addItem(tr("Vulkan (Experimental)"), 3);
     setupInput(cbxRenderer3D);
     grid->addWidget(cbxRenderer3D, 0, 1);
 
@@ -1910,7 +1913,8 @@ void WatermelonSettingsDialog::loadSettings()
     swJitFastMem->setChecked(globalCfg.GetBool("JIT.FastMemory"));
 
     // Graphics
-    cbxRenderer3D->setCurrentIndex(qBound(0, globalCfg.GetInt("3D.Renderer"), 2));
+    int rIdx = cbxRenderer3D->findData(globalCfg.GetInt("3D.Renderer"));
+    cbxRenderer3D->setCurrentIndex(rIdx >= 0 ? rIdx : 1);
     int scale = globalCfg.GetInt("3D.GL.ScaleFactor");
     if (scale >= 1 && scale <= 8) {
         cbxScaleFactor->setCurrentIndex(scale - 1);
@@ -2107,7 +2111,7 @@ void WatermelonSettingsDialog::saveSettings()
     globalCfg.SetBool("JIT.FastMemory", swJitFastMem->isChecked());
 
     // Graphics
-    globalCfg.SetInt("3D.Renderer", cbxRenderer3D->currentIndex());
+    globalCfg.SetInt("3D.Renderer", cbxRenderer3D->currentData().toInt());
     globalCfg.SetInt("3D.GL.ScaleFactor", cbxScaleFactor->currentIndex() + 1);
     globalCfg.SetBool("Screen.VSync", swVSync->isChecked());
     globalCfg.SetBool("3D.GL.BetterPolygons", swBetterPolygons->isChecked());

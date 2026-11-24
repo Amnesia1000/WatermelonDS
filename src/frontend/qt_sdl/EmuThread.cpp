@@ -562,6 +562,7 @@ void EmuThread::handleMessages()
         case msg_InitGL:
             emuInstance->initOpenGL(msg.param.value<int>());
             useOpenGL = true;
+            videoSettingsDirty = true;
             break;
 
         case msg_DeInitGL:

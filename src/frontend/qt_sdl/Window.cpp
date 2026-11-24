@@ -2760,6 +2760,8 @@ void MainWindow::showEmulator()
         createScreenPanel();
         applyScreenConfig();
         glContextDirty = false;
+        if (hasOGL && emuThread)
+            emuThread->initContext(windowID);
     }
 
     if (panel)

@@ -21,8 +21,6 @@
 #include <string.h>
 #include <queue>
 
-#include <enet/enet.h>
-
 #include <QStandardItemModel>
 #include <QProcess>
 

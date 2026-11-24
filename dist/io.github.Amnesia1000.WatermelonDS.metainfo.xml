@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.Amnesia1000.WatermelonDS</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>WatermelonDS</name>
+  <summary>Nintendo DS and DSi emulator with a modern frontend and RetroAchievements</summary>
+  <description>
+    <p>
+      WatermelonDS is a Nintendo DS and DSi emulator frontend and core based on melonDS,
+      inspired by the WatermelonDS Android project.
+    </p>
+    <p>Features include:</p>
+    <ul>
+      <li>Modern game library launcher with box art and recent shelf</li>
+      <li>Integrated RetroAchievements support with automatic hashing and golden badges</li>
+      <li>In-game floating control bar with frame stepping, pausing, resetting, and settings</li>
+      <li>Unified categorized settings dialog with visual DS controller mapping</li>
+      <li>High-resolution OpenGL 3D rendering and software renderer</li>
+      <li>Full audio, microphone, and controller support</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">io.github.Amnesia1000.WatermelonDS.desktop</launchable>
+  <url type="homepage">https://github.com/Amnesia1000/WatermelonDS</url>
+  <url type="bugtracker">https://github.com/Amnesia1000/WatermelonDS/issues</url>
+  <provides>
+    <binary>melonDS</binary>
+  </provides>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="1.0.0" date="2026-11-24">
+      <description>
+        <p>Initial release of WatermelonDS Desktop with modern launcher, floating HUD, unified settings, and RetroAchievements.</p>
+      </description>
+    </release>
+  </releases>
+</component>

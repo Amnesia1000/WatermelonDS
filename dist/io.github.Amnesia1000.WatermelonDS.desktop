@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=WatermelonDS
+GenericName=Nintendo DS & DSi Emulator
+Comment=Fast, feature-rich Nintendo DS and DSi emulator with modern interface and RetroAchievements.
+Exec=melonDS %f
+Type=Application
+Categories=Game;Emulator;Qt;
+Terminal=false
+Icon=io.github.Amnesia1000.WatermelonDS
+MimeType=application/x-nintendo-ds-rom;application/x-nds;application/x-gba-rom;
+Keywords=emulator;Nintendo;DS;NDS;DSi;GBA;RetroAchievements;
+StartupWMClass=melonDS

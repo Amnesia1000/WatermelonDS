@@ -273,9 +273,18 @@ if (UNIX AND NOT APPLE)
         install(FILES ${CMAKE_SOURCE_DIR}/res/icon/melon_${SIZE}x${SIZE}.png
             DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/${SIZE}x${SIZE}/apps
             RENAME net.kuribo64.melonDS.png)
+        install(FILES ${CMAKE_SOURCE_DIR}/res/icon/melon_${SIZE}x${SIZE}.png
+            DESTINATION ${CMAKE_INSTALL_PREFIX}/share/icons/hicolor/${SIZE}x${SIZE}/apps
+            RENAME io.github.Amnesia1000.WatermelonDS.png)
     endforeach()
 
     install(FILES ${CMAKE_SOURCE_DIR}/res/net.kuribo64.melonDS.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications)
+    if (EXISTS "${CMAKE_SOURCE_DIR}/dist/io.github.Amnesia1000.WatermelonDS.desktop")
+        install(FILES ${CMAKE_SOURCE_DIR}/dist/io.github.Amnesia1000.WatermelonDS.desktop DESTINATION ${CMAKE_INSTALL_PREFIX}/share/applications)
+    endif()
+    if (EXISTS "${CMAKE_SOURCE_DIR}/dist/io.github.Amnesia1000.WatermelonDS.metainfo.xml")
+        install(FILES ${CMAKE_SOURCE_DIR}/dist/io.github.Amnesia1000.WatermelonDS.metainfo.xml DESTINATION ${CMAKE_INSTALL_PREFIX}/share/metainfo)
+    endif()
     install(TARGETS melonDS BUNDLE DESTINATION ${CMAKE_BINARY_DIR} RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 
     if (NOT USE_QT6)

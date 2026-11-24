@@ -117,3 +117,28 @@ jobs:
         with:
           path: ${{ github.workspace }}/vcpkg_cache
           key: vcpkg-x86_64-mingw-${{ hashFiles('vcpkg.json') }}
+
+  build-flatpak:
+    name: Build Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.8
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: WatermelonDS.flatpak
+          manifest-path: dist/flatpak/io.github.Amnesia1000.WatermelonDS.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Upload Flatpak Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WatermelonDS-flatpak
+          path: WatermelonDS.flatpak
+          if-no-files-found: warn
+      - name: Upload Flatpak Release Asset
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: WatermelonDS.flatpak

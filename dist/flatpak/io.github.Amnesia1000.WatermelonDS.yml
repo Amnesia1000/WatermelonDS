@@ -1,0 +1,47 @@
+app-id: io.github.Amnesia1000.WatermelonDS
+runtime: org.kde.Platform
+runtime-version: '6.8'
+sdk: org.kde.Sdk
+command: melonDS
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --share=network
+  - --device=all
+  - --filesystem=home
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+
+modules:
+  - name: libenet
+    sources:
+      - sha256: 28603c895f9ed24a846478180ee72c7376b39b4bb1287b73877e5eae7d96b0dd
+        type: archive
+        url: https://github.com/lsalzman/enet/archive/v1.3.18.tar.gz
+      - type: script
+        dest-filename: autogen.sh
+        commands:
+          - autoreconf -ifv
+
+  - name: faad2
+    buildsystem: cmake-ninja
+    sources:
+      - sha256: 3fcbd305e4abd34768c62050e18ca0986f7d9c5eca343fb98275418013065c0e
+        type: archive
+        url: https://github.com/knik0/faad2/archive/refs/tags/2.11.2.tar.gz
+
+  - name: watermelonds
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DENABLE_LTO=OFF
+      - -DUSE_QT6=ON
+      - -DMELONDS_EMBED_BUILD_INFO=ON
+    sources:
+      - type: dir
+        path: ../../

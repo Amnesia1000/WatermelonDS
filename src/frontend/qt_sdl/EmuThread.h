@@ -40,6 +40,7 @@ class NDS;
 }
 
 class EmuInstance;
+class WatermelonRAEngine;
 class MainWindow;
 class ScreenPanelGL;
 
@@ -136,9 +137,11 @@ public:
     void returnGL();
     void updateVideoSettings() { videoSettingsDirty = true; }
     void updateVideoRenderer() { videoSettingsDirty = true; lastVideoRenderer = -1; }
+    void setRAEngine(WatermelonRAEngine* engine) { raEngine = engine; }
 
     int frontBuffer = 0;
     QMutex frontBufferLock;
+    WatermelonRAEngine* raEngine = nullptr;
 
     QWaitCondition glBorrowCond;
     QMutex glBorrowMutex;

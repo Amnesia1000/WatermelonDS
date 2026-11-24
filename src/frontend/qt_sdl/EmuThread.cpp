@@ -56,6 +56,7 @@
 #include "Savestate.h"
 
 #include "EmuInstance.h"
+#include "WatermelonRAEngine.h"
 
 using namespace melonDS;
 
@@ -315,6 +316,9 @@ void EmuThread::run()
             if (emuInstance->ndsSave)
                 emuInstance->ndsSave->CheckFlush();
 
+            if (raEngine)
+                raEngine->doFrame();
+
             if (emuInstance->gbaSave)
                 emuInstance->gbaSave->CheckFlush();
 
@@ -447,6 +451,9 @@ void EmuThread::run()
 
             SDL_Delay(75);
 
+            if (raEngine && emuActive)
+                raEngine->idle();
+
             if (useOpenGL)
             {
                 emuInstance->drawScreenGL();
@@ -551,6 +558,8 @@ void EmuThread::handleMessages()
 
         case msg_EmuReset:
             emuInstance->reset();
+            if (raEngine)
+                raEngine->resetSession();
 
             emuStatus = emuStatus_Running;
             emuPauseStack = emuPauseStackRunning;

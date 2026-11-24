@@ -66,6 +66,8 @@ set(SOURCES_QT_SDL
     WatermelonLauncher.cpp
     WatermelonRADialog.h
     WatermelonRADialog.cpp
+    WatermelonRAEngine.h
+    WatermelonRAEngine.cpp
     WatermelonGameDialog.h
     WatermelonGameDialog.cpp
     WatermelonSettingsDialog.h
@@ -109,7 +111,10 @@ add_executable(melonDS ${SOURCES_QT_SDL})
 add_subdirectory("../../net"
     ${CMAKE_BINARY_DIR}/net)
 
-target_link_libraries(melonDS PRIVATE net-utils)
+add_subdirectory("../../rcheevos"
+    ${CMAKE_BINARY_DIR}/rcheevos)
+
+target_link_libraries(melonDS PRIVATE net-utils rcheevos)
 
 if (WIN32)
     target_link_libraries(melonDS PUBLIC opengl32)

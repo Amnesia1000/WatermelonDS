@@ -85,6 +85,7 @@
 #include "AboutDialog.h"
 #include "WatermelonLauncher.h"
 #include "WatermelonRADialog.h"
+#include "WatermelonRAEngine.h"
 #include "WatermelonSettingsDialog.h"
 #include "WatermelonFloatingBar.h"
 #include "WatermelonGameDialog.h"
@@ -703,6 +704,16 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
     panel = nullptr;
     launcher = nullptr;
     floatingBar = nullptr;
+    raEngine = nullptr;
+    if (windowID == 0)
+    {
+        raEngine = new WatermelonRAEngine(this);
+        if (emuThread)
+            emuThread->setRAEngine(raEngine);
+        connect(raEngine, &WatermelonRAEngine::osdNotification, this, [this](const QString& msg, unsigned int color) {
+            if (panel) panel->osdAddMessage(color, msg.toUtf8().constData());
+        });
+    }
     if (windowID != 0 || (emuThread && emuThread->emuIsActive()))
         createScreenPanel();
 
@@ -1247,6 +1258,8 @@ bool MainWindow::preloadROMs(QStringList file, QStringList gbafile, bool boot)
         recentFileList.prepend(file.join("|"));
         updateRecentFilesMenu();
         ndsloaded = true;
+        if (raEngine && windowID == 0 && emuInstance && emuInstance->getNDS())
+            raEngine->startSession(file.first(), emuInstance->getNDS());
     }
     else if (boot)
     {
@@ -2479,6 +2492,7 @@ void MainWindow::onEmuStart()
 
 void MainWindow::onEmuStop()
 {
+    if (raEngine) raEngine->stopSession();
     if (floatingBar) floatingBar->hideBar();
     showLauncher();
     if (!hasMenu) return;

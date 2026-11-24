@@ -37,6 +37,7 @@
 
 class WatermelonLauncher;
 class WatermelonFloatingBar;
+class WatermelonRAEngine;
 
 #include "Screen.h"
 #include "Config.h"
@@ -387,6 +388,7 @@ public:
 
     WatermelonLauncher* launcher = nullptr;
     WatermelonFloatingBar* floatingBar = nullptr;
+    WatermelonRAEngine* raEngine = nullptr;
     QAction* actShowLauncher = nullptr;
     QAction* actRetroAchievements = nullptr;
 };

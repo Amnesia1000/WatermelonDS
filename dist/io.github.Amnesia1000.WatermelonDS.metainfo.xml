@@ -23,6 +23,9 @@
   <launchable type="desktop-id">io.github.Amnesia1000.WatermelonDS.desktop</launchable>
   <url type="homepage">https://github.com/Amnesia1000/WatermelonDS</url>
   <url type="bugtracker">https://github.com/Amnesia1000/WatermelonDS/issues</url>
+  <developer>
+    <name>Amnesia1000</name>
+  </developer>
   <provides>
     <binary>melonDS</binary>
   </provides>

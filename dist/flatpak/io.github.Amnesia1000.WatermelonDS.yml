@@ -42,6 +42,9 @@ modules:
       - -DENABLE_LTO=OFF
       - -DUSE_QT6=ON
       - -DMELONDS_EMBED_BUILD_INFO=ON
+      - -DMELONDS_BUILD_PROVIDER=Flatpak
+      - -DMELONDS_GIT_BRANCH=main
+      - -DMELONDS_GIT_HASH=v1.0.0
     sources:
       - type: dir
         path: ../../

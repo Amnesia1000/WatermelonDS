@@ -71,52 +71,52 @@ Este proyecto nace combinando lo mejor de dos mundos:
 
 ---
 
-## ⚖️ ¿Qué ofrecemos a diferencia de melonDS clásico y WatermelonDS Android?
+## ⚖️ What We Offer — Compared to Classic melonDS & WatermelonDS Android
 
-### 🆚 Frente a melonDS clásico (Desktop):
-| Característica | melonDS Clásico | 🍉 WatermelonDS Desktop |
+### 🆚 Compared to Classic melonDS (Desktop):
+| Feature | Classic melonDS | 🍉 WatermelonDS Desktop |
 | :--- | :---: | :---: |
-| **Lanzador visual de juegos (Game Hub)** | ❌ (Solo diálogo de archivos) | ✅ Cuadrícula con carátulas automáticas en alta resolución y estantería "Continuar jugando" |
-| **Escalado dinámico de carátulas** | ❌ | ✅ Slider de zoom interactivo en vivo (100px – 260px) |
-| **Experiencia visual inmersiva** | ❌ (Barra de menús gris superior fija) | ✅ 100% libre de barras de menú clásicas; inmersión total en emulación y pantalla completa |
-| **Barra de control in-game (HUD)** | ❌ | ✅ Píldora flotante que aparece al acercar el cursor con modo compacto responsive para cualquier tamaño de ventana |
-| **Ajustes centralizados** | ❌ (Menús dispersos y ventanas modales) | ✅ Diálogo unificado y moderno por categorías (General, Sistema, Gráficos, Audio, Mandos, Rutas, Shaders, Logros) |
-| **Mapeo visual de mandos** | ❌ (Listas de texto desplegables) | ✅ Silueta interactiva de Nintendo DS para asignar botones de mando y teclado visualmente |
-| **RetroAchievements** | ❌ (Sin integración nativa) | ✅ Totalmente integrado: hashing MD5 oficial (rcheevos), insignias de trofeo en carátulas y panel de perfil |
-| **Gestión de trucos por juego** | ❌ (Global/rudimentaria) | ✅ Pestaña dedicada por juego con códigos manuales e importación de bases de datos R4 (`usrcheat.dat`) |
-| **Soporte multilingüe** | ❌ (Solo inglés) | ✅ Español e Inglés con selector dinámico en ajustes |
+| **Visual Game Hub & Library** | ❌ (Plain file dialog) | ✅ Dynamic cover art grid with auto-downloading & "Continue Playing" shelf |
+| **Live Cover Zoom Slider** | ❌ | ✅ Interactive slider (100px – 260px) to scale library cards dynamically |
+| **Zero-Distraction In-Game Display** | ❌ (Persistent top grey menu bar) | ✅ 100% clean viewport; classic menu bar eliminated while hotkeys stay active |
+| **Floating In-Game HUD** | ❌ | ✅ Responsive top pill on hover with auto-compact mode for small/1x DS windows |
+| **Unified Settings Dialog** | ❌ (Scattered across multiple menu dialogs) | ✅ Modern sidebar categories (General, System, 3D Graphics, Audio, Controllers, Paths, Shaders, RetroAchievements) |
+| **Visual Controller Mapping** | ❌ (Dropdown text lists) | ✅ Interactive DS silhouette — click console buttons/D-pad directly to bind keys/gamepad |
+| **Native RetroAchievements** | ❌ (No native support) | ✅ rcheevos MD5 hashing, cover trophy badges, user profile summary & achievements list |
+| **Per-Game Action Replay Cheats** | ❌ (Global/rudimentary) | ✅ Dedicated cheat manager per ROM, manual code validator & R4 `usrcheat.dat` importer |
+| **Multilingual UI Support** | ❌ (English only) | ✅ Live language selector (English & Spanish) with 100% translated UI |
 
-### 🆚 Frente a WatermelonDS original (Android):
-- 🖥️ **Rendimiento Nativo en Ordenadores de Escritorio**: Construido desde cero en **C++17 y Qt 6** nativo para Linux y Windows, sin depender de máquinas virtuales Java/Kotlin ni capas de emulación móvil.
-- 🎮 **Soporte Extensivo para Periféricos de PC**: Soporte para mandos de Xbox, PlayStation, Nintendo Switch, mandos genéricos y teclado completo con remapeo visual interactivo.
-- 🖥️ **Experiencia Multiventana y Multi-monitor**: Ventana escalable libremente, modo pantalla completa sin bordes y compatibilidad con pipelines de shaders RetroArch (`.slangp` y `.glslp`).
-- 📦 **Empaquetado Nativo para Escritorio**: Disponible en formatos **AppImage**, **Flatpak**, **Tarball** para Linux y **ZIP portable** para Windows.
-
----
-
-## 🚀 Registro de Cambios — v1.0.0 (Versión Inicial Funcional)
-
-- **Lanzador Visual Completo**: Cuadrícula de juegos con descarga automática de portadas, estantería de títulos recientes, badges de trofeo dorado RetroAchievements y etiqueta DS/DSi.
-- **Slider de Tamaño de Carátulas**: Deslizador interactivo en la cabecera de la biblioteca para escalar el tamaño de las portadas dinámicamente según la preferencia del usuario.
-- **Eliminación Total de la Barra de Menú Clásica**: La interfaz ahora aprovecha el 100% del área de juego con todos los atajos de teclado preservados (`Ctrl+O`, `F1-F8`, `F11`, etc.).
-- **Barra Flotante In-Game Responsiva**: HUD flotante superior con modo compacto para ventanas pequeñas (oculta texto y optimiza iconos para ventanas de 256px o 1x nativo sin desbordarse).
-- **Diálogo de Ajustes Unificado**: Portabilidad del 100% de las opciones de melonDS a una interfaz categorizada moderna con silueta gráfica para configuración de controles.
-- **Integración con RetroAchievements**: Autenticación, visualización de estado de logros por juego, cálculo de hash MD5 según estándar rcheevos y diálogo de resumen de perfil.
-- **Trucos Action Replay**: Pestaña dedicada por juego, validación hexadecimal e importador de `usrcheat.dat`.
-- **Compatibilidad de Compilación Multiplataforma**: Soporte limpio en Linux (Ubuntu 22.04 LTS / Qt 6.2+) y Windows (MSYS2 UCRT64 / MinGW).
+### 🆚 Compared to Original WatermelonDS (Android):
+- 🖥️ **Native Desktop Performance**: Built from scratch in **C++17 & Qt 6** for Linux and Windows with zero mobile emulation overhead or Android runtimes.
+- 🎮 **Full PC Peripheral Support**: First-class support for Xbox, PlayStation DualShock/DualSense, Nintendo Switch Pro, generic gamepads, and full keyboard customization.
+- 🖥️ **Multi-Monitor, Free Window Scaling & Shaders**: Borderless fullscreen, multi-screen layouts, and RetroArch post-processing shaders (`.slangp` & `.glslp`).
+- 📦 **Native Desktop Distribution**: Packaged as **AppImage**, **Flatpak**, **Linux Tarball**, and **Portable Windows ZIP**.
 
 ---
 
-## 📥 Descargas / Downloads
+## 🚀 Changelog — v1.0.0 (Initial Working Release)
 
-Puedes descargar la última versión compilada para tu sistema operativo desde la sección de **[Releases](https://github.com/Amnesia1000/WatermelonDS/releases)**:
+- **Complete Visual Game Launcher**: Box art grid with automatic cover caching, recent games shelf, RetroAchievements gold trophy badges, and DS/DSi format indicators.
+- **Dynamic Cover Size Slider**: Live slider control in library header to enlarge or shrink box art seamlessly.
+- **Classic Menu Bar Eliminated**: Full-viewport immersion during gameplay with all window shortcuts (`Ctrl+O`, `F1`–`F8`, `F11`, etc.) preserved.
+- **Responsive Floating In-Game HUD**: Sleek top control pill that appears on mouse hover; automatically switches to compact icon-only mode on small windows (e.g. 1x native 256px) without clipping.
+- **Unified Modern Settings**: 100% of melonDS settings ported to a clean categorized dialog with interactive DS console controller mapping.
+- **RetroAchievements Integration**: Account login, profile overview dialog, per-game achievement lists, and official `rcheevos` MD5 ROM hashing.
+- **Action Replay Cheats**: Per-game cheat management, manual hex code validator, and `usrcheat.dat` database importer.
+- **Cross-Platform Compatibility**: Clean builds and CI workflows for Linux (Ubuntu 22.04 LTS / Qt 6.2+) and Windows (MSYS2 UCRT64 / MinGW).
 
-| Plataforma | Formato | Notas |
+---
+
+## 📥 Downloads / Descargas
+
+You can download the latest compiled binaries from the **[Releases](https://github.com/Amnesia1000/WatermelonDS/releases)** page:
+
+| Platform | Format | Description |
 | :--- | :--- | :--- |
-| 🐧 **Linux** (x86_64) | `.AppImage` | Paquete autónomo ejecutable ("doble clic y jugar"). |
-| 🐧 **Linux** (x86_64) | `.flatpak` | Bundle Flatpak aislado para cualquier distribución. |
-| 🐧 **Linux** (x86_64) | `.tar.gz` | Binario portable para Linux. |
-| 🪟 **Windows** (x86_64) | `.zip` (Portable) | Descomprimir y ejecutar `WatermelonDS.exe`. |
+| 🐧 **Linux** (x86_64) | `.AppImage` | Standalone executable package ("double-click and play"). |
+| 🐧 **Linux** (x86_64) | `.flatpak` | Universal sandboxed Flatpak bundle. |
+| 🐧 **Linux** (x86_64) | `.tar.gz` | Portable Linux archive. |
+| 🪟 **Windows** (x86_64) | `.zip` (Portable) | Extract and run `WatermelonDS.exe`. |
 
 ---
 

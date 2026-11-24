@@ -59,7 +59,6 @@ private slots:
     void onMultiplayerClicked();
     void onAddDirectoryClicked();
     void onRefreshClicked();
-    void onShadersClicked();
     void onRetroAchievementsClicked();
     void onSettingsClicked();
     void onCoverDownloaded(const QString& key, const QPixmap& pixmap);
@@ -93,7 +92,6 @@ private:
     QPushButton* btnOpen = nullptr;
     QPushButton* btnBootFirmware = nullptr;
     QPushButton* btnMultiplayer = nullptr;
-    QPushButton* btnShaders = nullptr;
     QPushButton* btnRA = nullptr;
     QPushButton* btnSettings = nullptr;
     QPushButton* btnAddDir = nullptr;

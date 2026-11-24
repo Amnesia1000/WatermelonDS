@@ -1,5 +1,4 @@
 #include "WatermelonLauncher.h"
-#include "WatermelonShaderDialog.h"
 #include "WatermelonRADialog.h"
 #include "WatermelonGameDialog.h"
 #include "WatermelonSettingsDialog.h"
@@ -271,12 +270,6 @@ void WatermelonLauncher::setupUI()
     btnMultiplayer->setToolTip(tr("Partidas multijugador local o por red (LAN)"));
     connect(btnMultiplayer, &QPushButton::clicked, this, &WatermelonLauncher::onMultiplayerClicked);
     buttonsRow->addWidget(btnMultiplayer);
-
-    btnShaders = new QPushButton(this);
-    btnShaders->setCursor(Qt::PointingHandCursor);
-    btnShaders->setToolTip(tr("Catálogo y configuración de shaders"));
-    connect(btnShaders, &QPushButton::clicked, this, &WatermelonLauncher::onShadersClicked);
-    buttonsRow->addWidget(btnShaders);
 
     btnRA = new QPushButton(this);
     btnRA->setCursor(Qt::PointingHandCursor);
@@ -628,7 +621,6 @@ void WatermelonLauncher::updateHeaderResponsiveness(int w)
         btnOpen->setText(tr("📁 Abrir ROM..."));
         btnBootFirmware->setText(tr("▶ Sistema"));
         btnMultiplayer->setText(tr("👥 Multijugador"));
-        btnShaders->setText(tr("🎨 Shaders"));
         btnRA->setText(tr("🏆 Logros"));
         btnSettings->setText(tr("⚙ Ajustes"));
         btnAddDir->setText(tr("➕ Carpeta"));
@@ -639,7 +631,6 @@ void WatermelonLauncher::updateHeaderResponsiveness(int w)
         btnOpen->setText(tr("📁 Abrir"));
         btnBootFirmware->setText(tr("▶ Sistema"));
         btnMultiplayer->setText(tr("👥 Multi"));
-        btnShaders->setText(tr("🎨 Shaders"));
         btnRA->setText(tr("🏆 Logros"));
         btnSettings->setText(tr("⚙ Ajustes"));
         btnAddDir->setVisible(false);
@@ -649,7 +640,6 @@ void WatermelonLauncher::updateHeaderResponsiveness(int w)
         btnOpen->setText(tr("📁"));
         btnBootFirmware->setText(tr("▶"));
         btnMultiplayer->setText(tr("👥"));
-        btnShaders->setText(tr("🎨"));
         btnRA->setText(tr("🏆"));
         btnSettings->setText(tr("⚙"));
         btnAddDir->setVisible(false);
@@ -1255,12 +1245,6 @@ void WatermelonLauncher::onAddDirectoryClicked()
 void WatermelonLauncher::onRefreshClicked()
 {
     refresh();
-}
-
-void WatermelonLauncher::onShadersClicked()
-{
-    WatermelonShaderDialog dlg(this);
-    dlg.exec();
 }
 
 void WatermelonLauncher::onRetroAchievementsClicked()

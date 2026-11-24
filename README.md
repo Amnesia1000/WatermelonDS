@@ -66,8 +66,8 @@ Este proyecto nace combinando lo mejor de dos mundos:
 - Lista detallada de logros por juego, con estado de desbloqueo, insignias y progreso.
 
 ### 🎨 Shaders de Post-Procesado
-- Compatibilidad con presets de shaders de RetroArch (`.slangp` y `.glslp`).
-- Selector visual de shaders con previsualización en vivo y configuración global o individual por juego.
+- Shaders GLSL integrados de aplicación en vivo bajo OpenGL: **CRT-Lottes**, **LCD3x (Rejilla DS)**, **ScaleFx (Suavizado HD)** y **xBRZ**.
+- Configurables directamente desde el apartado **Gráficos** del diálogo unificado de ajustes.
 
 ---
 
@@ -89,7 +89,7 @@ Este proyecto nace combinando lo mejor de dos mundos:
 ### 🆚 Compared to Original WatermelonDS (Android):
 - 🖥️ **Native Desktop Performance**: Built from scratch in **C++17 & Qt 6** for Linux and Windows with zero mobile emulation overhead or Android runtimes.
 - 🎮 **Full PC Peripheral Support**: First-class support for Xbox, PlayStation DualShock/DualSense, Nintendo Switch Pro, generic gamepads, and full keyboard customization.
-- 🖥️ **Multi-Monitor, Free Window Scaling & Shaders**: Borderless fullscreen, multi-screen layouts, and RetroArch post-processing shaders (`.slangp` & `.glslp`).
+- 🖥️ **Multi-Monitor, Free Window Scaling & Shaders**: Borderless fullscreen, multi-screen layouts, and built-in OpenGL GLSL post-processing shaders (CRT-Lottes, LCD3x, ScaleFx, xBRZ).
 - 📦 **Native Desktop Distribution**: Packaged as **AppImage**, **Flatpak**, **Linux Tarball**, and **Portable Windows ZIP**.
 
 ---

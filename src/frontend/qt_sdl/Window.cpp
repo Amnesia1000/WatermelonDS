@@ -84,7 +84,6 @@
 #include "Window.h"
 #include "AboutDialog.h"
 #include "WatermelonLauncher.h"
-#include "WatermelonShaderDialog.h"
 #include "WatermelonRADialog.h"
 #include "WatermelonSettingsDialog.h"
 #include "WatermelonFloatingBar.h"
@@ -636,12 +635,6 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
             }
 
             menu->addSeparator();
-
-            actRetroArchShaders = menu->addAction("RetroArch Shaders...");
-            connect(actRetroArchShaders, &QAction::triggered, this, [this]() {
-                WatermelonShaderDialog dlg(this);
-                dlg.exec();
-            });
 
             actRetroAchievements = menu->addAction("RetroAchievements...");
             connect(actRetroAchievements, &QAction::triggered, this, [this]() {

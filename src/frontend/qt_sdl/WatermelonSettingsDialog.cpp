@@ -1,5 +1,4 @@
 #include "WatermelonSettingsDialog.h"
-#include "WatermelonShaderDialog.h"
 #include "WatermelonRADialog.h"
 #include "InputConfig/InputConfigDialog.h"
 #include "Window.h"

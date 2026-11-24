@@ -215,7 +215,7 @@ private:
     GLuint screenVertexBuffer, screenVertexArray;
     GLuint screenTexture;
     GLuint screenShaderProgram;
-    GLint screenShaderTransformULoc, screenShaderScreenSizeULoc;
+    GLint screenShaderTransformULoc, screenShaderScreenSizeULoc, screenShaderModeULoc;
 
     QMutex screenSettingsLock;
     WindowInfo windowInfo;

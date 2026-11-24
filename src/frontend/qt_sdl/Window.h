@@ -388,7 +388,6 @@ public:
     WatermelonLauncher* launcher = nullptr;
     WatermelonFloatingBar* floatingBar = nullptr;
     QAction* actShowLauncher = nullptr;
-    QAction* actRetroArchShaders = nullptr;
     QAction* actRetroAchievements = nullptr;
 };
 

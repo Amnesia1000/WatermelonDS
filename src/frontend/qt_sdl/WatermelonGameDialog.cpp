@@ -4,7 +4,6 @@
 
 #include "WatermelonGameDialog.h"
 #include "WatermelonRADialog.h"
-#include "WatermelonShaderDialog.h"
 #include "WatermelonSettingsDialog.h"
 #include "ARCodeFile.h"
 #include "ARDatabaseDAT.h"
@@ -524,48 +523,7 @@ QWidget* WatermelonGameDialog::createConfigTab()
         {QStringLiteral("Global"), QStringLiteral("Software"), tr("OpenGL (Hardware)")},
         0);
 
-    // Shader row (custom)
-    auto* shaderRow = new QWidget();
-    shaderRow->setMinimumHeight(52);
-    {
-        auto* sLay = new QHBoxLayout(shaderRow);
-        sLay->setContentsMargins(16, 0, 10, 0);
-        sLay->setSpacing(8);
-        auto* sLbl = new QLabel(tr("Shader RetroArch"), shaderRow);
-        sLbl->setStyleSheet(QStringLiteral(
-            "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
-        sLay->addWidget(sLbl, 1);
-
-        shaderLabel = new QLabel(tr("Global"), shaderRow);
-        shaderLabel->setStyleSheet(QStringLiteral(
-            "font-size: 12px; color: #b3b1bd; background: transparent; max-width: 160px;"));
-        shaderLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
-        sLay->addWidget(shaderLabel);
-
-        auto* btnChange = new QPushButton(tr("  Cambiar  "), shaderRow);
-        btnChange->setMinimumWidth(80);
-        btnChange->setFixedHeight(28);
-        btnChange->setStyleSheet(QStringLiteral(
-            "QPushButton { background: #252433; color: #6fbf4a; border: 1px solid #3a3848; "
-            "border-radius: 7px; font-size: 11px; font-weight: 700; }"
-            "QPushButton:hover { background: #2e2d40; }"
-        ));
-        connect(btnChange, &QPushButton::clicked, this, &WatermelonGameDialog::onChooseShaderClicked);
-        sLay->addWidget(btnChange);
-
-        auto* btnClear = new QPushButton(tr("  Quitar  "), shaderRow);
-        btnClear->setMinimumWidth(60);
-        btnClear->setFixedHeight(28);
-        btnClear->setStyleSheet(QStringLiteral(
-            "QPushButton { background: #252433; color: #c94444; border: 1px solid #4a2828; "
-            "border-radius: 7px; font-size: 11px; font-weight: 700; }"
-            "QPushButton:hover { background: #3a2030; color: #e5534b; }"
-        ));
-        connect(btnClear, &QPushButton::clicked, this, &WatermelonGameDialog::onClearShaderClicked);
-        sLay->addWidget(btnClear);
-    }
-
-    cLay->addWidget(buildSection({}, {pickerRenderer, shaderRow}, content));
+    cLay->addWidget(buildSection({}, {pickerRenderer}, content));
 
     // ── RENDIMIENTO ───────────────────────────────────────────────────────
     cLay->addWidget(makeSectionLabel(QStringLiteral("Rendimiento"), content));
@@ -2366,23 +2324,9 @@ void WatermelonGameDialog::onSaveConfigClicked()
         tr("Configuración de '%1' guardada.").arg(romInfo.title));
 }
 
-void WatermelonGameDialog::onChooseShaderClicked()
-{
-    WatermelonShaderDialog dlg(this);
-    if (dlg.exec() == QDialog::Accepted) {
-        QString p = dlg.getActivePresetPath();
-        if (!p.isEmpty()) {
-            currentShaderPath = p;
-            if (shaderLabel) shaderLabel->setText(QFileInfo(p).fileName());
-        }
-    }
-}
+void WatermelonGameDialog::onChooseShaderClicked() {}
 
-void WatermelonGameDialog::onClearShaderClicked()
-{
-    currentShaderPath.clear();
-    if (shaderLabel) shaderLabel->setText(tr("Global"));
-}
+void WatermelonGameDialog::onClearShaderClicked() {}
 
 void WatermelonGameDialog::onChooseGBACartClicked()
 {

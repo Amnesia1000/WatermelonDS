@@ -64,8 +64,6 @@ set(SOURCES_QT_SDL
     WatermelonTheme.cpp
     WatermelonLauncher.h
     WatermelonLauncher.cpp
-    WatermelonShaderDialog.h
-    WatermelonShaderDialog.cpp
     WatermelonRADialog.h
     WatermelonRADialog.cpp
     WatermelonGameDialog.h

@@ -909,6 +909,7 @@ void ScreenPanelGL::initOpenGL()
 
     screenShaderScreenSizeULoc = glGetUniformLocation(screenShaderProgram, "uScreenSize");
     screenShaderTransformULoc = glGetUniformLocation(screenShaderProgram, "uTransform");
+    screenShaderModeULoc = glGetUniformLocation(screenShaderProgram, "uShaderMode");
 
     // to prevent bleeding between both parts of the screen
     // with bilinear filtering enabled
@@ -1112,6 +1113,21 @@ void ScreenPanelGL::drawScreenGL()
 
         glUseProgram(screenShaderProgram);
         glUniform2f(screenShaderScreenSizeULoc, w / factor, h / factor);
+
+        int shaderMode = 0;
+        if (screenShaderModeULoc >= 0)
+        {
+            QString curShader = emuInstance->getGlobalConfig().GetQString("WatermelonShader");
+            if (curShader.contains(QStringLiteral("crt"), Qt::CaseInsensitive))
+                shaderMode = 1;
+            else if (curShader.contains(QStringLiteral("lcd"), Qt::CaseInsensitive))
+                shaderMode = 2;
+            else if (curShader.contains(QStringLiteral("scale"), Qt::CaseInsensitive))
+                shaderMode = 3;
+            else if (curShader.contains(QStringLiteral("xbrz"), Qt::CaseInsensitive))
+                shaderMode = 4;
+            glUniform1i(screenShaderModeULoc, shaderMode);
+        }
 
         int frontbuf = emuThread->frontBuffer;
         glActiveTexture(GL_TEXTURE0);

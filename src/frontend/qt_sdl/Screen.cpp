@@ -664,7 +664,7 @@ void ScreenPanel::osdUpdate()
     {
         OSDItem& item = *it;
 
-        if ((!osdEnabled) || (item.timestamp < tick_min))
+        if ((!osdEnabled && !item.forceShow) || (item.timestamp < (item.forceShow ? tick_now - 4000 : tick_min)))
         {
             osdDeleteItem(&item);
             it = osdItems.erase(it);

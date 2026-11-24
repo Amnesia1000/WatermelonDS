@@ -109,7 +109,7 @@ void WatermelonRAEngine::loadGameInternal(const QString& romPath)
                 if (game && game->title && rc_client_has_achievements(client))
                 {
                     emit self->osdNotification(
-                        QStringLiteral("🏆 RetroAchievements: %1").arg(QString::fromUtf8(game->title)),
+                        QStringLiteral("RA Loaded: %1").arg(QString::fromUtf8(game->title)),
                         0xFF6FBF4A);
                 }
             }
@@ -254,7 +254,7 @@ void WatermelonRAEngine::eventHandlerCallback(const rc_client_event_t* event, rc
                 QString title = QString::fromUtf8(event->achievement->title);
                 uint32_t pts = event->achievement->points;
                 emit self->osdNotification(
-                    QStringLiteral("🏆 Logro desbloqueado: %1 (%2 pts)").arg(title).arg(pts),
+                    QStringLiteral("Achievement Unlocked: %1 (%2 pts)").arg(title).arg(pts),
                     0xFFF5B041);
             }
             break;
@@ -262,9 +262,9 @@ void WatermelonRAEngine::eventHandlerCallback(const rc_client_event_t* event, rc
         case RC_CLIENT_EVENT_GAME_COMPLETED:
             if (const auto* game = rc_client_get_game_info(client))
             {
-                QString title = game->title ? QString::fromUtf8(game->title) : QStringLiteral("Juego");
+                QString title = game->title ? QString::fromUtf8(game->title) : QStringLiteral("Game");
                 emit self->osdNotification(
-                    QStringLiteral("👑 ¡Juego completado al 100%%! %1").arg(title),
+                    QStringLiteral("Mastered 100%%! %1").arg(title),
                     0xFFF5B041);
             }
             break;

@@ -135,12 +135,26 @@ void WatermelonFloatingBar::setCompactMode(bool compact)
     if (isCompact)
     {
         setStyleSheet(QString::fromLatin1(kFloatingBarBaseStyle) +
-                      QStringLiteral("QPushButton { padding: 4px 6px; font-size: 11px; }"));
+                      QStringLiteral("QPushButton { padding: 5px 7px; font-size: 15px; }"));
+        lblStatus->setStyleSheet(QStringLiteral("font-size: 14px; padding: 0 2px; background: transparent;"));
+        const QSize compactIcon(18, 18);
+        btnPause->setIconSize(compactIcon);
+        btnFrameStep->setIconSize(compactIcon);
+        btnReset->setIconSize(compactIcon);
+        btnStop->setIconSize(compactIcon);
+        btnFullscreen->setIconSize(compactIcon);
     }
     else
     {
         setStyleSheet(QString::fromLatin1(kFloatingBarBaseStyle) +
                       QStringLiteral("QPushButton { padding: 5px 12px; font-size: 12px; }"));
+        lblStatus->setStyleSheet(QStringLiteral("font-size: 11px; padding: 0 4px; background: transparent;"));
+        const QSize normalIcon(14, 14);
+        btnPause->setIconSize(normalIcon);
+        btnFrameStep->setIconSize(normalIcon);
+        btnReset->setIconSize(normalIcon);
+        btnStop->setIconSize(QSize(13, 13));
+        btnFullscreen->setIconSize(normalIcon);
     }
 
     if (auto* lay = qobject_cast<QHBoxLayout*>(layout()))
@@ -148,7 +162,7 @@ void WatermelonFloatingBar::setCompactMode(bool compact)
         if (isCompact)
         {
             lay->setContentsMargins(6, 4, 6, 4);
-            lay->setSpacing(3);
+            lay->setSpacing(4);
         }
         else
         {
@@ -166,6 +180,24 @@ void WatermelonFloatingBar::updateForWindowWidth(int windowWidth)
     // Threshold: if window is less than 860px wide, use compact icons-only mode
     // so the full-text bar never clips on narrower windows.
     setCompactMode(windowWidth < 860);
+
+    // On ultra-narrow windows (e.g. 1x DS 256px), hide the status dot so the 18px icons fit
+    bool ultraNarrow = (windowWidth < 340);
+    if (lblStatus) lblStatus->setVisible(!ultraNarrow);
+    if (auto* lay = qobject_cast<QHBoxLayout*>(layout()))
+    {
+        if (lay->count() > 1)
+        {
+            if (auto* sep1 = lay->itemAt(1)->widget())
+                sep1->setVisible(!ultraNarrow);
+        }
+        if (ultraNarrow)
+        {
+            lay->setContentsMargins(4, 3, 4, 3);
+            lay->setSpacing(2);
+        }
+    }
+    adjustSize();
 }
 
 void WatermelonFloatingBar::refreshButtonTexts()

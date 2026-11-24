@@ -49,7 +49,7 @@ Este proyecto nace combinando lo mejor de dos mundos:
 - **Diseño lateral moderno**: Inspirado en emuladores contemporáneos (Ryujinx, Yuzu, Lichii), agrupando todas las opciones de forma limpia en pestañas laterales:
   - **General**: Idioma del firmware, nombre de usuario, mensaje personal y selector de color favorito con muestras de color visuales.
   - **Sistema**: Tipo de consola (DS / DSi), selector gráfico de BIOS y Firmware personalizados, y tamaño de bloque JIT.
-  - **Gráficos**: Motor 3D (OpenGL, Vulkan, Software), escalado interno, filtro de texturas y sincronización vertical.
+  - **Gráficos**: Motor 3D (OpenGL, OpenGL Compute, Software), escalado interno, filtro de texturas y sincronización vertical.
   - **Audio & Micrófono**: Dispositivos de salida, volumen, interpolación y fuentes de micrófono (ruido blanco, patrón o micrófono real).
   - **Mando & Controles**: Interfaz visual de mapeo interactivo replicando la silueta original de la Nintendo DS con soporte para teclado y mandos vía SDL2.
   - **Logros (RetroAchievements)**: Configuración completa de Hardcore Mode, Rich Presence, sonidos y logros no oficiales.

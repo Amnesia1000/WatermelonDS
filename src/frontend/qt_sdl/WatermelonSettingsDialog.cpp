@@ -4,6 +4,11 @@
 #include "InputConfig/InputConfigDialog.h"
 #include "Window.h"
 #include "Config.h"
+#include "Net.h"
+#include "Net_PCap.h"
+#include "Wifi.h"
+#include "MPInterface.h"
+#include "CameraManager.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -15,6 +20,7 @@
 #include <QLineEdit>
 #include <QComboBox>
 #include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QSlider>
 #include <QListWidget>
 #include <QFileDialog>
@@ -25,6 +31,24 @@
 #include <QFrame>
 #include <QDialogButtonBox>
 #include <QApplication>
+#include <QRadioButton>
+#include <QButtonGroup>
+#include <SDL2/SDL.h>
+#if QT_VERSION >= 0x060000
+#include <QMediaDevices>
+#include <QCameraDevice>
+#endif
+
+#ifdef __WIN32__
+#define PCAP_NAME "winpcap/npcap"
+#else
+#define PCAP_NAME "libpcap"
+#endif
+
+extern std::optional<melonDS::LibPCap> pcap;
+extern melonDS::Net net;
+extern CameraManager* camManager[2];
+void NetInit();
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Helper: Find MainWindow
@@ -113,6 +137,13 @@ WatermelonSettingsDialog::WatermelonSettingsDialog(QWidget* parent, int initialC
     setMinimumSize(860, 600);
     setModal(true);
 
+    if (!pcap)
+        pcap = melonDS::LibPCap::New();
+
+    hasNetPcap = pcap.has_value();
+    if (pcap)
+        netAdapters = pcap->GetAdapters();
+
     setupUI();
     loadSettings();
 
@@ -167,20 +198,24 @@ void WatermelonSettingsDialog::setupUI()
         "}"
     ));
 
-    auto* itemGeneral  = new QListWidgetItem(tr("🛠  General"), sidebarList);
-    auto* itemSystem   = new QListWidgetItem(tr("🪪  Sistema"), sidebarList);
-    auto* itemCpu      = new QListWidgetItem(tr("⚙  CPU"), sidebarList);
-    auto* itemGraphics = new QListWidgetItem(tr("🖥  Gráficos"), sidebarList);
-    auto* itemAudio    = new QListWidgetItem(tr("🔊  Audio"), sidebarList);
-    auto* itemControls = new QListWidgetItem(tr("🎮  Controles"), sidebarList);
-    auto* itemRA       = new QListWidgetItem(tr("🏆  Logros"), sidebarList);
+    auto* itemGeneral     = new QListWidgetItem(tr("🛠  General"), sidebarList);
+    auto* itemSystem      = new QListWidgetItem(tr("🪪  Sistema"), sidebarList);
+    auto* itemCpu         = new QListWidgetItem(tr("⚙  CPU"), sidebarList);
+    auto* itemGraphics    = new QListWidgetItem(tr("🖥  Gráficos"), sidebarList);
+    auto* itemDisplay     = new QListWidgetItem(tr("🖼  Pantalla"), sidebarList);
+    auto* itemAudio       = new QListWidgetItem(tr("🔊  Audio"), sidebarList);
+    auto* itemControls    = new QListWidgetItem(tr("🎮  Controles"), sidebarList);
+    auto* itemMultiplayer = new QListWidgetItem(tr("🌐  Multijugador y Red"), sidebarList);
+    auto* itemRA          = new QListWidgetItem(tr("🏆  Logros"), sidebarList);
 
     Q_UNUSED(itemGeneral);
     Q_UNUSED(itemSystem);
     Q_UNUSED(itemCpu);
     Q_UNUSED(itemGraphics);
+    Q_UNUSED(itemDisplay);
     Q_UNUSED(itemAudio);
     Q_UNUSED(itemControls);
+    Q_UNUSED(itemMultiplayer);
     Q_UNUSED(itemRA);
 
     connect(sidebarList, &QListWidget::currentRowChanged, this, &WatermelonSettingsDialog::onCategoryChanged);
@@ -194,8 +229,10 @@ void WatermelonSettingsDialog::setupUI()
     pageStack->addWidget(createSystemPage());
     pageStack->addWidget(createCpuPage());
     pageStack->addWidget(createGraphicsPage());
+    pageStack->addWidget(createDisplayPage());
     pageStack->addWidget(createAudioPage());
     pageStack->addWidget(createControlsPage());
+    pageStack->addWidget(createMultiplayerPage());
     pageStack->addWidget(createRAPage());
 
     bodyLayout->addWidget(pageStack, 1);
@@ -305,12 +342,12 @@ static QFrame* createCard(QWidget* parent)
         "  border-radius: 8px;"
         "}"
         "QLabel { background: transparent; border: none; font-size: 13px; color: #f6f5f3; }"
-        "QLineEdit, QComboBox, QSpinBox {"
+        "QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {"
         "  background-color: #141318; border: 1px solid #2d2c38; border-radius: 6px;"
         "  color: #f6f5f3; padding: 0px 8px; height: 26px; min-height: 26px; max-height: 26px;"
         "  font-size: 13px;"
         "}"
-        "QLineEdit:focus, QComboBox:focus, QSpinBox:focus {"
+        "QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus {"
         "  border-color: #ff5477; background-color: #181720;"
         "}"
         "QComboBox { padding-right: 22px; }"
@@ -320,23 +357,23 @@ static QFrame* createCard(QWidget* parent)
         "QComboBox::down-arrow {"
         "  image: url(:/arrow-down); width: 10px; height: 10px;"
         "}"
-        "QSpinBox { padding-right: 20px; }"
-        "QSpinBox::up-button {"
+        "QSpinBox, QDoubleSpinBox { padding-right: 20px; }"
+        "QSpinBox::up-button, QDoubleSpinBox::up-button {"
         "  subcontrol-origin: border; subcontrol-position: top right; width: 18px;"
         "  border-left: 1px solid #2d2c38; border-bottom: 1px solid #2d2c38; border-top-right-radius: 5px;"
         "  background: #1c1b22;"
         "}"
-        "QSpinBox::up-button:hover { background: #282732; }"
-        "QSpinBox::up-arrow {"
+        "QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover { background: #282732; }"
+        "QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {"
         "  image: url(:/arrow-up); width: 8px; height: 8px;"
         "}"
-        "QSpinBox::down-button {"
+        "QSpinBox::down-button, QDoubleSpinBox::down-button {"
         "  subcontrol-origin: border; subcontrol-position: bottom right; width: 18px;"
         "  border-left: 1px solid #2d2c38; border-bottom-right-radius: 5px;"
         "  background: #1c1b22;"
         "}"
-        "QSpinBox::down-button:hover { background: #282732; }"
-        "QSpinBox::down-arrow {"
+        "QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background: #282732; }"
+        "QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {"
         "  image: url(:/arrow-down-small); width: 8px; height: 8px;"
         "}"
     ));
@@ -411,6 +448,39 @@ static QHBoxLayout* createPathRow(const QString& labelText, QLineEdit*& txtOut, 
     return row;
 }
 
+static QHBoxLayout* createFolderRow(const QString& labelText, QLineEdit*& txtOut, QWidget* parent)
+{
+    auto* row = new QHBoxLayout();
+    row->setSpacing(8);
+
+    auto* lbl = new QLabel(labelText, parent);
+    lbl->setFixedWidth(120);
+    row->addWidget(lbl);
+
+    txtOut = new QLineEdit(parent);
+    setupInput(txtOut);
+    row->addWidget(txtOut, 1);
+
+    auto* btnBrowse = new QPushButton(QCoreApplication::translate("WatermelonSettingsDialog", "Examinar..."), parent);
+    btnBrowse->setCursor(Qt::PointingHandCursor);
+    setupInput(btnBrowse, 90);
+    btnBrowse->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        "  background: #252430; border: 1px solid #363444; border-radius: 6px;"
+        "  color: #f6f5f3; padding: 2px 10px; font-size: 12px;"
+        "}"
+        "QPushButton:hover { background: #31303e; border-color: #ff5477; color: #ff5477; }"
+    ));
+    QLineEdit* targetEdit = txtOut;
+    QObject::connect(btnBrowse, &QPushButton::clicked, parent, [parent, targetEdit, labelText]() {
+        QString d = QFileDialog::getExistingDirectory(parent, labelText, targetEdit->text());
+        if (!d.isEmpty()) targetEdit->setText(d);
+    });
+    row->addWidget(btnBrowse);
+
+    return row;
+}
+
 // ───────────────────────────────────────────────────────────────────────────
 //  Page 1: General
 // ───────────────────────────────────────────────────────────────────────────
@@ -439,6 +509,21 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
 
     swMouseHide = new WatermelonSwitch(cardGen);
     cardGenLay->addLayout(createSwitchRow(swMouseHide, tr("Ocultar el cursor por inactividad"), tr("Oculta automáticamente la flecha del ratón mientras juegas."), cardGen));
+
+    auto* mouseDelayRow = new QHBoxLayout();
+    mouseDelayRow->setContentsMargins(24, 0, 0, 0);
+    mouseDelayRow->setSpacing(10);
+    auto* lblMouseDelay = new QLabel(tr("Segundos de inactividad:"), cardGen);
+    lblMouseDelay->setFixedWidth(160);
+    mouseDelayRow->addWidget(lblMouseDelay);
+    spnMouseHideSeconds = new QSpinBox(cardGen);
+    spnMouseHideSeconds->setRange(1, 30);
+    spnMouseHideSeconds->setValue(5);
+    spnMouseHideSeconds->setSuffix(QStringLiteral(" s"));
+    setupInput(spnMouseHideSeconds, 80);
+    mouseDelayRow->addWidget(spnMouseHideSeconds);
+    mouseDelayRow->addStretch();
+    cardGenLay->addLayout(mouseDelayRow);
 
     swDirectBoot = new WatermelonSwitch(cardGen);
     cardGenLay->addLayout(createSwitchRow(swDirectBoot, tr("Ejecución directa (Direct Boot)"), tr("Inicia los juegos inmediatamente saltando el menú de inicio de la consola."), cardGen));
@@ -499,6 +584,67 @@ QWidget* WatermelonSettingsDialog::createGeneralPage()
 
     cardDirsLay->addLayout(dirBtnsLay);
     lay->addWidget(cardDirs);
+
+    // Rutas de Guardado
+    lay->addWidget(createSectionTitle(tr("Rutas de Guardado"), content));
+    auto* cardPaths = createCard(content);
+    auto* pathsLay = new QVBoxLayout(cardPaths);
+    pathsLay->setContentsMargins(14, 12, 14, 12);
+    pathsLay->setSpacing(10);
+
+    pathsLay->addLayout(createFolderRow(tr("Partidas guardadas:"), txtSaveFilePath, cardPaths));
+    pathsLay->addLayout(createFolderRow(tr("Estados de guardado:"), txtSavestatePath, cardPaths));
+    pathsLay->addLayout(createFolderRow(tr("Archivos de trucos:"), txtCheatFilePath, cardPaths));
+
+    swSavestateRelocSRAM = new WatermelonSwitch(cardPaths);
+    pathsLay->addLayout(createSwitchRow(swSavestateRelocSRAM,
+        tr("Partidas independientes por cada Savestate"),
+        tr("Guarda una copia independiente del archivo de guardado (.sav) para cada ranura de savestate."),
+        cardPaths));
+
+    auto* lblPathsHint = new QLabel(tr("Si se dejan en blanco, los archivos se guardarán junto a la ROM o en el directorio por defecto."), cardPaths);
+    lblPathsHint->setStyleSheet(QStringLiteral("color: #8e8c99; font-size: 11px; background: transparent; border: none;"));
+    lblPathsHint->setWordWrap(true);
+    pathsLay->addWidget(lblPathsHint);
+
+    lay->addWidget(cardPaths);
+
+    // Velocidad de Emulación
+    lay->addWidget(createSectionTitle(tr("Velocidad de Emulación"), content));
+    auto* cardSpeed = createCard(content);
+    auto* speedGrid = new QGridLayout(cardSpeed);
+    speedGrid->setContentsMargins(16, 16, 16, 16);
+    speedGrid->setHorizontalSpacing(16);
+    speedGrid->setVerticalSpacing(14);
+
+    speedGrid->addWidget(new QLabel(tr("Velocidad Normal (FPS objetivo):"), cardSpeed), 0, 0);
+    spnTargetFPS = new QDoubleSpinBox(cardSpeed);
+    spnTargetFPS->setRange(1.0, 300.0);
+    spnTargetFPS->setDecimals(4);
+    spnTargetFPS->setValue(60.0);
+    spnTargetFPS->setSuffix(QStringLiteral(" FPS"));
+    setupInput(spnTargetFPS, 120);
+    speedGrid->addWidget(spnTargetFPS, 0, 1);
+
+    speedGrid->addWidget(new QLabel(tr("Avance Rápido (Fast Forward):"), cardSpeed), 1, 0);
+    spnFastForwardFPS = new QDoubleSpinBox(cardSpeed);
+    spnFastForwardFPS->setRange(1.0, 1000.0);
+    spnFastForwardFPS->setDecimals(2);
+    spnFastForwardFPS->setValue(120.0);
+    spnFastForwardFPS->setSuffix(QStringLiteral(" FPS"));
+    setupInput(spnFastForwardFPS, 120);
+    speedGrid->addWidget(spnFastForwardFPS, 1, 1);
+
+    speedGrid->addWidget(new QLabel(tr("Cámara Lenta (Slow Motion):"), cardSpeed), 2, 0);
+    spnSlowmoFPS = new QDoubleSpinBox(cardSpeed);
+    spnSlowmoFPS->setRange(1.0, 120.0);
+    spnSlowmoFPS->setDecimals(2);
+    spnSlowmoFPS->setValue(30.0);
+    spnSlowmoFPS->setSuffix(QStringLiteral(" FPS"));
+    setupInput(spnSlowmoFPS, 120);
+    speedGrid->addWidget(spnSlowmoFPS, 2, 1);
+
+    lay->addWidget(cardSpeed);
 
     // Idioma de la interfaz
     lay->addWidget(createSectionTitle(tr("Idioma de la Interfaz"), content));
@@ -679,6 +825,316 @@ QWidget* WatermelonSettingsDialog::createSystemPage()
 
     lay->addWidget(cardBios);
 
+    // Opciones de Nintendo DSi
+    lay->addWidget(createSectionTitle(tr("Opciones de Nintendo DSi"), content));
+    auto* cardDSi = createCard(content);
+    auto* dsiLay = new QVBoxLayout(cardDSi);
+    dsiLay->setContentsMargins(14, 12, 14, 12);
+    dsiLay->setSpacing(12);
+
+    swDSiFullBIOSBoot = new WatermelonSwitch(cardDSi);
+    dsiLay->addLayout(createSwitchRow(swDSiFullBIOSBoot,
+        tr("Arranque completo de BIOS DSi (Full BIOS Boot)"),
+        tr("Muestra la pantalla de inicio y reproduce la melodía original de Nintendo DSi."),
+        cardDSi));
+
+    swDSPHLE = new WatermelonSwitch(cardDSi);
+    dsiLay->addLayout(createSwitchRow(swDSPHLE,
+        tr("Emulación rápida de audio DSP (DSP HLE)"),
+        tr("Proporciona mayor rendimiento al emular el DSP. Desactívalo para emulación precisa por ciclo (LLE)."),
+        cardDSi));
+
+    auto* sepDSi = new QFrame(cardDSi);
+    sepDSi->setFrameShape(QFrame::HLine);
+    sepDSi->setStyleSheet(QStringLiteral("color: #272632; background: #272632; max-height: 1px; border: none; margin: 4px 0;"));
+    dsiLay->addWidget(sepDSi);
+
+    swDSiSDEnable = new WatermelonSwitch(cardDSi);
+    dsiLay->addLayout(createSwitchRow(swDSiSDEnable,
+        tr("Habilitar tarjeta SD de Nintendo DSi"),
+        tr("Permite a las aplicaciones y juegos de DSi acceder a una tarjeta SD interna virtual."),
+        cardDSi));
+
+    dsiSDContainer = new QWidget(cardDSi);
+    auto* dsiSDContainerLay = new QVBoxLayout(dsiSDContainer);
+    dsiSDContainerLay->setContentsMargins(6, 6, 6, 6);
+    dsiSDContainerLay->setSpacing(10);
+
+    const QString sdFilter = tr("Imágenes de tarjeta SD (*.bin *.rom *.img *.sd *.dmg);;Todos los archivos (*.*)");
+    dsiSDContainerLay->addLayout(createPathRow(tr("Imagen SD DSi:"), txtDSiSDPath, sdFilter, dsiSDContainer));
+
+    auto* dsiSizeRow = new QHBoxLayout();
+    dsiSizeRow->setSpacing(10);
+    auto* lblDSiSize = new QLabel(tr("Tamaño de imagen:"), dsiSDContainer);
+    lblDSiSize->setFixedWidth(120);
+    dsiSizeRow->addWidget(lblDSiSize);
+    cbxDSiSDSize = new QComboBox(dsiSDContainer);
+    cbxDSiSDSize->addItems({tr("Auto"), QStringLiteral("256 MB"), QStringLiteral("512 MB"), QStringLiteral("1 GB"), QStringLiteral("2 GB"), QStringLiteral("4 GB")});
+    setupInput(cbxDSiSDSize, 140);
+    dsiSizeRow->addWidget(cbxDSiSDSize);
+    dsiSizeRow->addStretch();
+    dsiSDContainerLay->addLayout(dsiSizeRow);
+
+    swDSiSDReadOnly = new WatermelonSwitch(dsiSDContainer);
+    dsiSDContainerLay->addLayout(createSwitchRow(swDSiSDReadOnly,
+        tr("Tarjeta SD en modo solo lectura"),
+        tr("Impide que la emulación modifique el contenido de la tarjeta SD."),
+        dsiSDContainer));
+
+    swDSiSDFolder = new WatermelonSwitch(dsiSDContainer);
+    dsiSDContainerLay->addLayout(createSwitchRow(swDSiSDFolder,
+        tr("Sincronizar contenido con una carpeta del sistema"),
+        tr("Sincroniza automáticamente los archivos de la imagen SD con una carpeta local en tu ordenador."),
+        dsiSDContainer));
+
+    dsiSDFolderContainer = new QWidget(dsiSDContainer);
+    auto* dsiSDFolderLay = new QVBoxLayout(dsiSDFolderContainer);
+    dsiSDFolderLay->setContentsMargins(0, 4, 0, 0);
+    dsiSDFolderLay->addLayout(createFolderRow(tr("Carpeta sincronizada:"), txtDSiSDFolder, dsiSDFolderContainer));
+    dsiSDContainerLay->addWidget(dsiSDFolderContainer);
+
+    connect(swDSiSDFolder, &WatermelonSwitch::toggled, dsiSDFolderContainer, &QWidget::setVisible);
+    connect(swDSiSDEnable, &WatermelonSwitch::toggled, dsiSDContainer, &QWidget::setVisible);
+
+    dsiLay->addWidget(dsiSDContainer);
+    lay->addWidget(cardDSi);
+
+    // Cámaras de Nintendo DSi
+    lay->addWidget(createSectionTitle(tr("Cámaras de Nintendo DSi"), content));
+    auto* cardCam = createCard(content);
+    auto* camLay = new QVBoxLayout(cardCam);
+    camLay->setContentsMargins(14, 12, 14, 12);
+    camLay->setSpacing(12);
+
+    auto* lblCam0Title = new QLabel(tr("<b>Cámara Exterior (Outer Camera):</b>"), cardCam);
+    lblCam0Title->setStyleSheet(QStringLiteral("color: #ff5477; font-size: 12px;"));
+    camLay->addWidget(lblCam0Title);
+
+    auto* cam0Row = new QHBoxLayout();
+    cam0Row->addWidget(new QLabel(tr("Modo de entrada:"), cardCam));
+    cbxCam0Type = new QComboBox(cardCam);
+    cbxCam0Type->addItems({tr("Desactivada (Imagen negra)"), tr("Imagen fija"), tr("Cámara web del sistema")});
+    setupInput(cbxCam0Type, 220);
+    cam0Row->addWidget(cbxCam0Type);
+    cam0Row->addStretch();
+    camLay->addLayout(cam0Row);
+
+    cam0ImageContainer = new QWidget(cardCam);
+    auto* c0ImgLay = new QVBoxLayout(cam0ImageContainer);
+    c0ImgLay->setContentsMargins(0, 0, 0, 0);
+    const QString imgFilter = tr("Imágenes (*.png *.bmp *.jpg *.jpeg);;Todos los archivos (*.*)");
+    c0ImgLay->addLayout(createPathRow(tr("Ruta de imagen:"), txtCam0ImagePath, imgFilter, cam0ImageContainer));
+    camLay->addWidget(cam0ImageContainer);
+
+    cam0DeviceContainer = new QWidget(cardCam);
+    auto* c0DevLay = new QHBoxLayout(cam0DeviceContainer);
+    c0DevLay->setContentsMargins(0, 0, 0, 0);
+    c0DevLay->addWidget(new QLabel(tr("Dispositivo webcam:"), cam0DeviceContainer));
+    cbxCam0Device = new QComboBox(cam0DeviceContainer);
+    setupInput(cbxCam0Device);
+    c0DevLay->addWidget(cbxCam0Device, 1);
+    camLay->addWidget(cam0DeviceContainer);
+
+    swCam0XFlip = new WatermelonSwitch(cardCam);
+    camLay->addLayout(createSwitchRow(swCam0XFlip, tr("Invertir horizontalmente"), QString(), cardCam));
+
+    auto* sepCam = new QFrame(cardCam);
+    sepCam->setFrameShape(QFrame::HLine);
+    sepCam->setStyleSheet(QStringLiteral("color: #272632; background: #272632; max-height: 1px; border: none; margin: 4px 0;"));
+    camLay->addWidget(sepCam);
+
+    auto* lblCam1Title = new QLabel(tr("<b>Cámara Interior (Inner Camera):</b>"), cardCam);
+    lblCam1Title->setStyleSheet(QStringLiteral("color: #ff5477; font-size: 12px;"));
+    camLay->addWidget(lblCam1Title);
+
+    auto* cam1Row = new QHBoxLayout();
+    cam1Row->addWidget(new QLabel(tr("Modo de entrada:"), cardCam));
+    cbxCam1Type = new QComboBox(cardCam);
+    cbxCam1Type->addItems({tr("Desactivada (Imagen negra)"), tr("Imagen fija"), tr("Cámara web del sistema")});
+    setupInput(cbxCam1Type, 220);
+    cam1Row->addWidget(cbxCam1Type);
+    cam1Row->addStretch();
+    camLay->addLayout(cam1Row);
+
+    cam1ImageContainer = new QWidget(cardCam);
+    auto* c1ImgLay = new QVBoxLayout(cam1ImageContainer);
+    c1ImgLay->setContentsMargins(0, 0, 0, 0);
+    c1ImgLay->addLayout(createPathRow(tr("Ruta de imagen:"), txtCam1ImagePath, imgFilter, cam1ImageContainer));
+    camLay->addWidget(cam1ImageContainer);
+
+    cam1DeviceContainer = new QWidget(cardCam);
+    auto* c1DevLay = new QHBoxLayout(cam1DeviceContainer);
+    c1DevLay->setContentsMargins(0, 0, 0, 0);
+    c1DevLay->addWidget(new QLabel(tr("Dispositivo webcam:"), cam1DeviceContainer));
+    cbxCam1Device = new QComboBox(cam1DeviceContainer);
+    setupInput(cbxCam1Device);
+    c1DevLay->addWidget(cbxCam1Device, 1);
+    camLay->addWidget(cam1DeviceContainer);
+
+    swCam1XFlip = new WatermelonSwitch(cardCam);
+    camLay->addLayout(createSwitchRow(swCam1XFlip, tr("Invertir horizontalmente"), QString(), cardCam));
+
+#if QT_VERSION >= 0x060000
+    const QList<QCameraDevice> cameras = QMediaDevices::videoInputs();
+    for (const QCameraDevice &cameraInfo : cameras) {
+        cbxCam0Device->addItem(cameraInfo.description());
+        cbxCam1Device->addItem(cameraInfo.description());
+    }
+#endif
+
+    auto updateCamVisibility = [this]() {
+        int t0 = cbxCam0Type->currentIndex();
+        cam0ImageContainer->setVisible(t0 == 1);
+        cam0DeviceContainer->setVisible(t0 == 2);
+
+        int t1 = cbxCam1Type->currentIndex();
+        cam1ImageContainer->setVisible(t1 == 1);
+        cam1DeviceContainer->setVisible(t1 == 2);
+    };
+
+    connect(cbxCam0Type, QOverload<int>::of(&QComboBox::currentIndexChanged), this, updateCamVisibility);
+    connect(cbxCam1Type, QOverload<int>::of(&QComboBox::currentIndexChanged), this, updateCamVisibility);
+    updateCamVisibility();
+
+    lay->addWidget(cardCam);
+
+    // Almacenamiento DLDI (Slot-1 / Homebrew)
+    lay->addWidget(createSectionTitle(tr("Almacenamiento DLDI (Slot-1 / Homebrew)"), content));
+    auto* cardDLDI = createCard(content);
+    auto* dldiLay = new QVBoxLayout(cardDLDI);
+    dldiLay->setContentsMargins(14, 12, 14, 12);
+    dldiLay->setSpacing(12);
+
+    swDLDIEnable = new WatermelonSwitch(cardDLDI);
+    dldiLay->addLayout(createSwitchRow(swDLDIEnable,
+        tr("Habilitar emulación DLDI (Slot-1 SD)"),
+        tr("Permite que los juegos y aplicaciones homebrew accedan a una tarjeta SD emulada."),
+        cardDLDI));
+
+    dldiContainer = new QWidget(cardDLDI);
+    auto* dldiContainerLay = new QVBoxLayout(dldiContainer);
+    dldiContainerLay->setContentsMargins(6, 6, 6, 6);
+    dldiContainerLay->setSpacing(10);
+
+    const QString dldiFilter = tr("Imágenes de disco (*.bin *.rom *.img *.dmg);;Todos los archivos (*.*)");
+    dldiContainerLay->addLayout(createPathRow(tr("Imagen SD DLDI:"), txtDLDISDPath, dldiFilter, dldiContainer));
+
+    auto* dldiSizeRow = new QHBoxLayout();
+    dldiSizeRow->setSpacing(10);
+    auto* lblDLDISize = new QLabel(tr("Tamaño de imagen:"), dldiContainer);
+    lblDLDISize->setFixedWidth(120);
+    dldiSizeRow->addWidget(lblDLDISize);
+    cbxDLDISize = new QComboBox(dldiContainer);
+    cbxDLDISize->addItems({tr("Auto"), QStringLiteral("256 MB"), QStringLiteral("512 MB"), QStringLiteral("1 GB"), QStringLiteral("2 GB"), QStringLiteral("4 GB")});
+    setupInput(cbxDLDISize, 140);
+    dldiSizeRow->addWidget(cbxDLDISize);
+    dldiSizeRow->addStretch();
+    dldiContainerLay->addLayout(dldiSizeRow);
+
+    swDLDIReadOnly = new WatermelonSwitch(dldiContainer);
+    dldiContainerLay->addLayout(createSwitchRow(swDLDIReadOnly,
+        tr("Tarjeta DLDI en modo solo lectura"),
+        tr("Impide que la emulación modifique el contenido de la imagen DLDI."),
+        dldiContainer));
+
+    swDLDIFolder = new WatermelonSwitch(dldiContainer);
+    dldiContainerLay->addLayout(createSwitchRow(swDLDIFolder,
+        tr("Sincronizar contenido con una carpeta del sistema"),
+        tr("Sincroniza automáticamente los archivos de la imagen DLDI con una carpeta local en tu ordenador."),
+        dldiContainer));
+
+    dldiFolderContainer = new QWidget(dldiContainer);
+    auto* dldiFolderLay = new QVBoxLayout(dldiFolderContainer);
+    dldiFolderLay->setContentsMargins(0, 4, 0, 0);
+    dldiFolderLay->addLayout(createFolderRow(tr("Carpeta sincronizada:"), txtDLDIFolder, dldiFolderContainer));
+    dldiContainerLay->addWidget(dldiFolderContainer);
+
+    connect(swDLDIFolder, &WatermelonSwitch::toggled, dldiFolderContainer, &QWidget::setVisible);
+    connect(swDLDIEnable, &WatermelonSwitch::toggled, dldiContainer, &QWidget::setVisible);
+
+    dldiLay->addWidget(dldiContainer);
+    lay->addWidget(cardDLDI);
+
+    // Fecha y Hora (Reloj RTC)
+    lay->addWidget(createSectionTitle(tr("Fecha y Hora del Sistema (RTC)"), content));
+    auto* cardRTC = createCard(content);
+    auto* rtcLay = new QVBoxLayout(cardRTC);
+    rtcLay->setContentsMargins(14, 12, 14, 12);
+    rtcLay->setSpacing(12);
+
+    swCustomRTC = new WatermelonSwitch(cardRTC);
+    rtcLay->addLayout(createSwitchRow(swCustomRTC, tr("Usar fecha y hora personalizada"),
+        tr("Si está desactivado, el reloj interno de la consola se sincroniza automáticamente con el de tu ordenador."), cardRTC));
+
+    rtcContainer = new QWidget(cardRTC);
+    auto* rtcContainerLay = new QHBoxLayout(rtcContainer);
+    rtcContainerLay->setContentsMargins(6, 4, 6, 4);
+    rtcContainerLay->setSpacing(10);
+
+    auto* lblRTC = new QLabel(tr("Fecha y hora fijada:"), rtcContainer);
+    lblRTC->setFixedWidth(140);
+    rtcContainerLay->addWidget(lblRTC);
+
+    dteCustomRTC = new QDateTimeEdit(QDateTime::currentDateTime(), rtcContainer);
+    dteCustomRTC->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+    dteCustomRTC->setCalendarPopup(true);
+    setupInput(dteCustomRTC, 180);
+    rtcContainerLay->addWidget(dteCustomRTC);
+
+    btnRTCNow = new QPushButton(tr("Ahora"), rtcContainer);
+    btnRTCNow->setCursor(Qt::PointingHandCursor);
+    setupInput(btnRTCNow, 70);
+    btnRTCNow->setStyleSheet(QStringLiteral(
+        "QPushButton { background: #252430; border: 1px solid #363444; border-radius: 6px; "
+        "color: #f6f5f3; padding: 2px 10px; font-size: 12px; } "
+        "QPushButton:hover { background: #31303e; border-color: #ff5477; color: #ff5477; }"));
+    connect(btnRTCNow, &QPushButton::clicked, this, [this]() {
+        if (dteCustomRTC) dteCustomRTC->setDateTime(QDateTime::currentDateTime());
+    });
+    rtcContainerLay->addWidget(btnRTCNow);
+    rtcContainerLay->addStretch();
+
+    rtcLay->addWidget(rtcContainer);
+    connect(swCustomRTC, &WatermelonSwitch::toggled, rtcContainer, &QWidget::setVisible);
+    lay->addWidget(cardRTC);
+
+    // Gestión de Energía y Batería
+    lay->addWidget(createSectionTitle(tr("Gestión de Energía y Batería"), content));
+    auto* cardPower = createCard(content);
+    auto* powerLay = new QVBoxLayout(cardPower);
+    powerLay->setContentsMargins(14, 12, 14, 12);
+    powerLay->setSpacing(12);
+
+    auto* powerGrid = new QGridLayout();
+    powerGrid->setContentsMargins(6, 4, 6, 4);
+    powerGrid->setHorizontalSpacing(16);
+    powerGrid->setVerticalSpacing(12);
+
+    powerGrid->addWidget(new QLabel(tr("Batería Nintendo DS:"), cardPower), 0, 0);
+    cbxDSBattery = new QComboBox(cardPower);
+    cbxDSBattery->addItem(tr("Normal (Carga suficiente / LED verde)"), true);
+    cbxDSBattery->addItem(tr("Batería baja (LED rojo)"), false);
+    setupInput(cbxDSBattery);
+    powerGrid->addWidget(cbxDSBattery, 0, 1);
+
+    powerGrid->addWidget(new QLabel(tr("Nivel de batería Nintendo DSi:"), cardPower), 1, 0);
+    cbxDSiBattery = new QComboBox(cardPower);
+    cbxDSiBattery->addItem(tr("Nivel 4 - Lleno (100%)"), 0xF);
+    cbxDSiBattery->addItem(tr("Nivel 3 - Tres cuartos (75%)"), 0xB);
+    cbxDSiBattery->addItem(tr("Nivel 2 - Medio (50%)"), 0x7);
+    cbxDSiBattery->addItem(tr("Nivel 1 - Bajo (25%)"), 0x3);
+    cbxDSiBattery->addItem(tr("Nivel 0 - Casi agotado"), 0x1);
+    setupInput(cbxDSiBattery);
+    powerGrid->addWidget(cbxDSiBattery, 1, 1);
+
+    powerLay->addLayout(powerGrid);
+
+    swDSiCharging = new WatermelonSwitch(cardPower);
+    powerLay->addLayout(createSwitchRow(swDSiCharging, tr("DSi conectada al cargador"),
+        tr("Simula que la consola Nintendo DSi está enchufada a la corriente y cargando."), cardPower));
+
+    lay->addWidget(cardPower);
+
     lay->addStretch();
     scroll->setWidget(content);
     return scroll;
@@ -822,7 +1278,117 @@ QWidget* WatermelonSettingsDialog::createGraphicsPage()
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-//  Page 5: Audio
+//  Page 5: Pantalla
+// ───────────────────────────────────────────────────────────────────────────
+
+QWidget* WatermelonSettingsDialog::createDisplayPage()
+{
+    auto* scroll = new QScrollArea();
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
+
+    auto* content = new QWidget();
+    auto* lay = new QVBoxLayout(content);
+    lay->setContentsMargins(24, 20, 24, 20);
+    lay->setSpacing(18);
+
+    lay->addWidget(createSectionTitle(tr("Disposición de Pantallas"), content));
+
+    auto* cardLayout = createCard(content);
+    auto* grid = new QGridLayout(cardLayout);
+    grid->setContentsMargins(16, 16, 16, 16);
+    grid->setHorizontalSpacing(16);
+    grid->setVerticalSpacing(14);
+
+    grid->addWidget(new QLabel(tr("Tamaño de ventana:"), cardLayout), 0, 0);
+    cbxWindowSize = new QComboBox(cardLayout);
+    cbxWindowSize->addItem(QStringLiteral("1x"), 1);
+    cbxWindowSize->addItem(QStringLiteral("2x"), 2);
+    cbxWindowSize->addItem(QStringLiteral("3x"), 3);
+    cbxWindowSize->addItem(QStringLiteral("4x"), 4);
+    setupInput(cbxWindowSize);
+    grid->addWidget(cbxWindowSize, 0, 1);
+
+    grid->addWidget(new QLabel(tr("Rotación de pantalla:"), cardLayout), 1, 0);
+    cbxScreenRotation = new QComboBox(cardLayout);
+    cbxScreenRotation->addItem(QStringLiteral("0°"), 0);
+    cbxScreenRotation->addItem(QStringLiteral("90°"), 1);
+    cbxScreenRotation->addItem(QStringLiteral("180°"), 2);
+    cbxScreenRotation->addItem(QStringLiteral("270°"), 3);
+    setupInput(cbxScreenRotation);
+    grid->addWidget(cbxScreenRotation, 1, 1);
+
+    grid->addWidget(new QLabel(tr("Separación entre pantallas:"), cardLayout), 2, 0);
+    spnScreenGap = new QSpinBox(cardLayout);
+    spnScreenGap->setRange(0, 500);
+    spnScreenGap->setSuffix(tr(" px"));
+    setupInput(spnScreenGap);
+    grid->addWidget(spnScreenGap, 2, 1);
+
+    grid->addWidget(new QLabel(tr("Disposición:"), cardLayout), 3, 0);
+    cbxScreenLayout = new QComboBox(cardLayout);
+    cbxScreenLayout->addItem(tr("Natural"), screenLayout_Natural);
+    cbxScreenLayout->addItem(tr("Vertical"), screenLayout_Vertical);
+    cbxScreenLayout->addItem(tr("Horizontal"), screenLayout_Horizontal);
+    cbxScreenLayout->addItem(tr("Híbrida"), screenLayout_Hybrid);
+    setupInput(cbxScreenLayout);
+    grid->addWidget(cbxScreenLayout, 3, 1);
+
+    grid->addWidget(new QLabel(tr("Tamaño de pantallas:"), cardLayout), 4, 0);
+    cbxScreenSizing = new QComboBox(cardLayout);
+    cbxScreenSizing->addItem(tr("Iguales"), screenSizing_Even);
+    cbxScreenSizing->addItem(tr("Énfasis superior"), screenSizing_EmphTop);
+    cbxScreenSizing->addItem(tr("Énfasis inferior"), screenSizing_EmphBot);
+    cbxScreenSizing->addItem(tr("Automático"), screenSizing_Auto);
+    cbxScreenSizing->addItem(tr("Solo superior"), screenSizing_TopOnly);
+    cbxScreenSizing->addItem(tr("Solo inferior"), screenSizing_BotOnly);
+    setupInput(cbxScreenSizing);
+    grid->addWidget(cbxScreenSizing, 4, 1);
+
+    grid->addWidget(new QLabel(tr("Aspecto pantalla superior:"), cardLayout), 5, 0);
+    cbxScreenAspectTop = new QComboBox(cardLayout);
+    for (int i = 0; i < AspectRatiosNum; i++)
+        cbxScreenAspectTop->addItem(QString::fromLatin1(aspectRatios[i].label), aspectRatios[i].id);
+    setupInput(cbxScreenAspectTop);
+    grid->addWidget(cbxScreenAspectTop, 5, 1);
+
+    grid->addWidget(new QLabel(tr("Aspecto pantalla inferior:"), cardLayout), 6, 0);
+    cbxScreenAspectBot = new QComboBox(cardLayout);
+    for (int i = 0; i < AspectRatiosNum; i++)
+        cbxScreenAspectBot->addItem(QString::fromLatin1(aspectRatios[i].label), aspectRatios[i].id);
+    setupInput(cbxScreenAspectBot);
+    grid->addWidget(cbxScreenAspectBot, 6, 1);
+
+    lay->addWidget(cardLayout);
+
+    lay->addWidget(createSectionTitle(tr("Opciones de Visualización"), content));
+
+    auto* cardOpts = createCard(content);
+    auto* optsLay = new QVBoxLayout(cardOpts);
+    optsLay->setContentsMargins(14, 12, 14, 12);
+    optsLay->setSpacing(12);
+
+    swScreenSwap = new WatermelonSwitch(cardOpts);
+    optsLay->addLayout(createSwitchRow(swScreenSwap, tr("Intercambiar pantallas"),
+        tr("Invierte la pantalla superior y la inferior."), cardOpts));
+
+    swIntegerScaling = new WatermelonSwitch(cardOpts);
+    optsLay->addLayout(createSwitchRow(swIntegerScaling, tr("Forzar escalado entero"),
+        tr("Mantiene los píxeles nítidos evitando interpolación al escalar."), cardOpts));
+
+    swScreenFilter = new WatermelonSwitch(cardOpts);
+    optsLay->addLayout(createSwitchRow(swScreenFilter, tr("Filtro de pantalla"),
+        tr("Suaviza la imagen al ampliarla."), cardOpts));
+
+    lay->addWidget(cardOpts);
+    lay->addStretch();
+    scroll->setWidget(content);
+    return scroll;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  Page 6: Audio
 // ───────────────────────────────────────────────────────────────────────────
 
 QWidget* WatermelonSettingsDialog::createAudioPage()
@@ -876,11 +1442,77 @@ QWidget* WatermelonSettingsDialog::createAudioPage()
 
     grid->addWidget(new QLabel(tr("Profundidad de Bits:"), cardAud), 2, 0);
     cbxBitDepth = new QComboBox(cardAud);
-    cbxBitDepth->addItems({tr("16 bits (Estándar)")});
+    cbxBitDepth->addItems({
+        tr("Automático (10 bits en DS, 16 bits en DSi)"),
+        tr("Forzar 10 bits (Sonido DS auténtico)"),
+        tr("Forzar 16 bits (Alta fidelidad)")
+    });
     setupInput(cbxBitDepth);
     grid->addWidget(cbxBitDepth, 2, 1);
 
+    swDSiVolumeSync = new WatermelonSwitch(cardAud);
+    auto* dsiVolLay = createSwitchRow(swDSiVolumeSync,
+        tr("Sincronizar volumen maestro con la consola DSi"),
+        tr("Sincroniza el nivel de volumen emulado con los controles internos de DSi."),
+        cardAud);
+    auto* dsiVolWrap = new QWidget(cardAud);
+    dsiVolWrap->setLayout(dsiVolLay);
+    grid->addWidget(dsiVolWrap, 3, 0, 1, 2);
+
     lay->addWidget(cardAud);
+
+    // Entrada de Micrófono
+    lay->addWidget(createSectionTitle(tr("Entrada de Micrófono"), content));
+    auto* cardMic = createCard(content);
+    auto* micLay = new QVBoxLayout(cardMic);
+    micLay->setContentsMargins(14, 12, 14, 12);
+    micLay->setSpacing(10);
+
+    auto* micTypeRow = new QHBoxLayout();
+    micTypeRow->addWidget(new QLabel(tr("Modo de entrada de micrófono:"), cardMic));
+    cbxMicInputType = new QComboBox(cardMic);
+    cbxMicInputType->addItems({
+        tr("Silencio (Sin entrada)"),
+        tr("Micrófono del sistema (Físico)"),
+        tr("Ruido blanco (Soplido constante)"),
+        tr("Archivo de audio WAV personalizado")
+    });
+    setupInput(cbxMicInputType, 260);
+    micTypeRow->addWidget(cbxMicInputType);
+    micTypeRow->addStretch();
+    micLay->addLayout(micTypeRow);
+
+    micDeviceContainer = new QWidget(cardMic);
+    auto* devLay = new QHBoxLayout(micDeviceContainer);
+    devLay->setContentsMargins(0, 0, 0, 0);
+    devLay->addWidget(new QLabel(tr("Dispositivo de micrófono:"), micDeviceContainer));
+    cbxMicDevice = new QComboBox(micDeviceContainer);
+    setupInput(cbxMicDevice);
+    devLay->addWidget(cbxMicDevice, 1);
+    micLay->addWidget(micDeviceContainer);
+
+    // Populate SDL audio input devices
+    const int numDevs = SDL_GetNumAudioDevices(true);
+    for (int i = 0; i < numDevs; i++) {
+        cbxMicDevice->addItem(QString::fromUtf8(SDL_GetAudioDeviceName(i, true)));
+    }
+
+    micWavContainer = new QWidget(cardMic);
+    auto* wavLay = new QVBoxLayout(micWavContainer);
+    wavLay->setContentsMargins(0, 0, 0, 0);
+    const QString wavFilter = tr("Archivos de audio (*.wav);;Todos los archivos (*.*)");
+    wavLay->addLayout(createPathRow(tr("Archivo WAV:"), txtMicWavPath, wavFilter, micWavContainer));
+    micLay->addWidget(micWavContainer);
+
+    auto updateMicVisibility = [this]() {
+        int t = cbxMicInputType->currentIndex();
+        micDeviceContainer->setVisible(t == 1);
+        micWavContainer->setVisible(t == 3);
+    };
+    connect(cbxMicInputType, QOverload<int>::of(&QComboBox::currentIndexChanged), this, updateMicVisibility);
+    updateMicVisibility();
+
+    lay->addWidget(cardMic);
     lay->addStretch();
     scroll->setWidget(content);
     return scroll;
@@ -940,7 +1572,143 @@ QWidget* WatermelonSettingsDialog::createControlsPage()
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-//  Page 7: RetroAchievements (Full Options!)
+//  Page 8: Multijugador y Red (Local Multiplayer & Nintendo WFC / LAN)
+// ───────────────────────────────────────────────────────────────────────────
+
+QWidget* WatermelonSettingsDialog::createMultiplayerPage()
+{
+    auto* scroll = new QScrollArea();
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setStyleSheet(QStringLiteral("background: transparent; border: none;"));
+
+    auto* content = new QWidget();
+    auto* lay = new QVBoxLayout(content);
+    lay->setContentsMargins(24, 20, 24, 20);
+    lay->setSpacing(18);
+
+    // Section 1: Multijugador Local (melonDS)
+    lay->addWidget(createSectionTitle(tr("Multijugador Local (melonDS)"), content));
+    auto* cardMP = createCard(content);
+    auto* gridMP = new QGridLayout(cardMP);
+    gridMP->setContentsMargins(16, 16, 16, 16);
+    gridMP->setHorizontalSpacing(16);
+    gridMP->setVerticalSpacing(14);
+
+    gridMP->addWidget(new QLabel(tr("Modo de audio multijugador:"), cardMP), 0, 0);
+    cbxMPAudioMode = new QComboBox(cardMP);
+    cbxMPAudioMode->addItem(tr("Todas las instancias"), 0);
+    cbxMPAudioMode->addItem(tr("Solo la primera instancia"), 1);
+    cbxMPAudioMode->addItem(tr("Solo la instancia enfocada"), 2);
+    setupInput(cbxMPAudioMode);
+    gridMP->addWidget(cbxMPAudioMode, 0, 1);
+
+    gridMP->addWidget(new QLabel(tr("Tiempo límite de recepción:"), cardMP), 1, 0);
+    spnMPRecvTimeout = new QSpinBox(cardMP);
+    spnMPRecvTimeout->setRange(1, 1000);
+    spnMPRecvTimeout->setSuffix(QStringLiteral(" ms"));
+    setupInput(spnMPRecvTimeout, 100);
+    gridMP->addWidget(spnMPRecvTimeout, 1, 1);
+    lay->addWidget(cardMP);
+
+    // Section 2: Wi-Fi y Conexión de Red (Nintendo WFC / LAN)
+    lay->addWidget(createSectionTitle(tr("Wi-Fi y Conexión de Red (Nintendo WFC / LAN)"), content));
+    auto* cardNet = createCard(content);
+    auto* netLay = new QVBoxLayout(cardNet);
+    netLay->setContentsMargins(16, 16, 16, 16);
+    netLay->setSpacing(12);
+
+    auto* grpMode = new QButtonGroup(cardNet);
+    rbIndirectMode = new QRadioButton(tr("Modo Indirecto / Slirp (Recomendado)"), cardNet);
+    rbIndirectMode->setToolTip(tr("Emula una red virtual NAT. No requiere privilegios de administrador ni configuración del adaptador físico."));
+    rbIndirectMode->setCursor(Qt::PointingHandCursor);
+    grpMode->addButton(rbIndirectMode);
+    netLay->addWidget(rbIndirectMode);
+
+    auto* lblIndirectDesc = new QLabel(tr("Emula una red NAT virtual. Recomendado para la mayoría de juegos y servicios WFC alternativos."), cardNet);
+    lblIndirectDesc->setStyleSheet(QStringLiteral("color: #7b788a; font-size: 11px; margin-left: 24px; margin-bottom: 4px;"));
+    lblIndirectDesc->setWordWrap(true);
+    netLay->addWidget(lblIndirectDesc);
+
+    rbDirectMode = new QRadioButton(tr("Modo Directo / PCap (Requiere %1 y conexión ethernet por cable)").arg(QStringLiteral(PCAP_NAME)), cardNet);
+    rbDirectMode->setToolTip(tr("Conecta la consola emulada directamente al adaptador físico."));
+    rbDirectMode->setCursor(Qt::PointingHandCursor);
+    grpMode->addButton(rbDirectMode);
+    netLay->addWidget(rbDirectMode);
+
+    adapterContainer = new QWidget(cardNet);
+    auto* adapterLay = new QGridLayout(adapterContainer);
+    adapterLay->setContentsMargins(24, 6, 0, 0);
+    adapterLay->setHorizontalSpacing(16);
+    adapterLay->setVerticalSpacing(10);
+
+    adapterLay->addWidget(new QLabel(tr("Adaptador de red:"), adapterContainer), 0, 0);
+    cbxNetAdapter = new QComboBox(adapterContainer);
+    setupInput(cbxNetAdapter);
+    adapterLay->addWidget(cbxNetAdapter, 0, 1);
+
+    adapterLay->addWidget(new QLabel(tr("Dirección MAC:"), adapterContainer), 1, 0);
+    lblAdapterMAC = new QLabel(QStringLiteral("(desconocida)"), adapterContainer);
+    lblAdapterMAC->setStyleSheet(QStringLiteral("color: #a09ea8; font-weight: 600;"));
+    adapterLay->addWidget(lblAdapterMAC, 1, 1);
+
+    adapterLay->addWidget(new QLabel(tr("Dirección IP:"), adapterContainer), 2, 0);
+    lblAdapterIP = new QLabel(QStringLiteral("(desconocida)"), adapterContainer);
+    lblAdapterIP->setStyleSheet(QStringLiteral("color: #a09ea8; font-weight: 600;"));
+    adapterLay->addWidget(lblAdapterIP, 2, 1);
+
+    netLay->addWidget(adapterContainer);
+
+    if (!hasNetPcap)
+    {
+        auto* lblNoPcap = new QLabel(tr("⚠️ %1 no está disponible en este sistema. El modo directo está desactivado.").arg(QStringLiteral(PCAP_NAME)), cardNet);
+        lblNoPcap->setStyleSheet(QStringLiteral("color: #e5a04d; font-size: 11px; margin-top: 6px;"));
+        lblNoPcap->setWordWrap(true);
+        netLay->addWidget(lblNoPcap);
+    }
+
+    connect(rbDirectMode, &QRadioButton::toggled, this, &WatermelonSettingsDialog::updateNetAdapterControls);
+    connect(rbIndirectMode, &QRadioButton::toggled, this, &WatermelonSettingsDialog::updateNetAdapterControls);
+    connect(cbxNetAdapter, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &WatermelonSettingsDialog::onNetAdapterIndexChanged);
+
+    lay->addWidget(cardNet);
+    lay->addStretch();
+    scroll->setWidget(content);
+    return scroll;
+}
+
+void WatermelonSettingsDialog::updateNetAdapterControls()
+{
+    bool enableDirect = hasNetPcap && rbDirectMode && rbDirectMode->isChecked();
+    if (adapterContainer)
+        adapterContainer->setEnabled(enableDirect);
+}
+
+void WatermelonSettingsDialog::onNetAdapterIndexChanged(int sel)
+{
+    if (!hasNetPcap || sel < 0 || sel >= (int)netAdapters.size() || netAdapters.empty())
+    {
+        if (lblAdapterMAC) lblAdapterMAC->setText(QStringLiteral("(ninguno)"));
+        if (lblAdapterIP) lblAdapterIP->setText(QStringLiteral("(ninguno)"));
+        return;
+    }
+
+    const melonDS::AdapterData& adapter = netAdapters[sel];
+    char macBuf[64];
+    snprintf(macBuf, sizeof(macBuf), "%02X:%02X:%02X:%02X:%02X:%02X",
+             adapter.MAC[0], adapter.MAC[1], adapter.MAC[2],
+             adapter.MAC[3], adapter.MAC[4], adapter.MAC[5]);
+    if (lblAdapterMAC) lblAdapterMAC->setText(QString::fromLatin1(macBuf));
+
+    char ipBuf[64];
+    snprintf(ipBuf, sizeof(ipBuf), "%d.%d.%d.%d",
+             adapter.IP_v4[0], adapter.IP_v4[1],
+             adapter.IP_v4[2], adapter.IP_v4[3]);
+    if (lblAdapterIP) lblAdapterIP->setText(QString::fromLatin1(ipBuf));
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+//  Page 9: RetroAchievements (Full Options!)
 // ───────────────────────────────────────────────────────────────────────────
 
 QWidget* WatermelonSettingsDialog::createRAPage()
@@ -1018,10 +1786,18 @@ QWidget* WatermelonSettingsDialog::createRAPage()
 void WatermelonSettingsDialog::loadSettings()
 {
     Config::Table globalCfg = Config::GetGlobalTable();
+    Config::Table localCfg0 = Config::GetLocalTable(0);
 
     // General
     swPauseLostFocus->setChecked(globalCfg.GetBool("PauseLostFocus"));
     swMouseHide->setChecked(globalCfg.GetBool("Mouse.Hide"));
+    spnMouseHideSeconds->setValue(qBound(1, globalCfg.GetInt("Mouse.HideSeconds"), 30));
+    double targetFps = globalCfg.GetDouble("TargetFPS");
+    spnTargetFPS->setValue(targetFps > 0 ? targetFps : 60.0);
+    double ffwdFps = globalCfg.GetDouble("FastForwardFPS");
+    spnFastForwardFPS->setValue(ffwdFps > 0 ? ffwdFps : 120.0);
+    double slowFps = globalCfg.GetDouble("SlowmoFPS");
+    spnSlowmoFPS->setValue(slowFps > 0 ? slowFps : 30.0);
     swDirectBoot->setChecked(globalCfg.GetBool("Emu.DirectBoot"));
     cbxUILanguage->setCurrentIndex(qMax(0, cbxUILanguage->findData(globalCfg.GetQString("UI.Language"))));
 
@@ -1033,6 +1809,11 @@ void WatermelonSettingsDialog::loadSettings()
             listRomDirs->addItem(d.trimmed());
         }
     }
+
+    txtSaveFilePath->setText(localCfg0.GetQString("SaveFilePath"));
+    txtSavestatePath->setText(localCfg0.GetQString("SavestatePath"));
+    txtCheatFilePath->setText(localCfg0.GetQString("CheatFilePath"));
+    swSavestateRelocSRAM->setChecked(globalCfg.GetBool("Savestate.RelocSRAM"));
 
     // System
     cbxConsoleType->setCurrentIndex(globalCfg.GetInt("Emu.ConsoleType"));
@@ -1055,6 +1836,71 @@ void WatermelonSettingsDialog::loadSettings()
     spnBirthDay->setValue(qMax(1, firmCfg.GetInt("BirthdayDay")));
     cbxBirthMonth->setCurrentIndex(qMax(0, firmCfg.GetInt("BirthdayMonth") - 1));
     txtMessage->setText(firmCfg.GetQString("Message"));
+
+    // DSi options
+    swDSiFullBIOSBoot->setChecked(globalCfg.GetBool("DSi.FullBIOSBoot"));
+    swDSPHLE->setChecked(globalCfg.GetBool("DSi.DSP.HLE"));
+    bool dsiSD = globalCfg.GetBool("DSi.SD.Enable");
+    swDSiSDEnable->setChecked(dsiSD);
+    dsiSDContainer->setVisible(dsiSD);
+    txtDSiSDPath->setText(globalCfg.GetQString("DSi.SD.ImagePath"));
+    cbxDSiSDSize->setCurrentIndex(qBound(0, globalCfg.GetInt("DSi.SD.ImageSize"), 5));
+    swDSiSDReadOnly->setChecked(globalCfg.GetBool("DSi.SD.ReadOnly"));
+    bool dsiFolder = globalCfg.GetBool("DSi.SD.FolderSync");
+    swDSiSDFolder->setChecked(dsiFolder);
+    dsiSDFolderContainer->setVisible(dsiFolder);
+    txtDSiSDFolder->setText(globalCfg.GetQString("DSi.SD.FolderPath"));
+
+    // DLDI options
+    bool dldi = globalCfg.GetBool("DLDI.Enable");
+    swDLDIEnable->setChecked(dldi);
+    dldiContainer->setVisible(dldi);
+    txtDLDISDPath->setText(globalCfg.GetQString("DLDI.ImagePath"));
+    cbxDLDISize->setCurrentIndex(qBound(0, globalCfg.GetInt("DLDI.ImageSize"), 5));
+    swDLDIReadOnly->setChecked(globalCfg.GetBool("DLDI.ReadOnly"));
+    bool dldiFolder = globalCfg.GetBool("DLDI.FolderSync");
+    swDLDIFolder->setChecked(dldiFolder);
+    dldiFolderContainer->setVisible(dldiFolder);
+    txtDLDIFolder->setText(globalCfg.GetQString("DLDI.FolderPath"));
+
+    // DSi Cameras
+    cbxCam0Type->setCurrentIndex(qBound(0, globalCfg.GetInt("DSi.Camera0.InputType"), 2));
+    txtCam0ImagePath->setText(globalCfg.GetQString("DSi.Camera0.ImagePath"));
+    QString dev0 = globalCfg.GetQString("DSi.Camera0.DeviceName");
+    if (!dev0.isEmpty()) {
+        int idx = cbxCam0Device->findData(dev0);
+        if (idx < 0) idx = cbxCam0Device->findText(dev0);
+        if (idx >= 0) cbxCam0Device->setCurrentIndex(idx);
+    }
+    swCam0XFlip->setChecked(globalCfg.GetBool("DSi.Camera0.XFlip"));
+
+    cbxCam1Type->setCurrentIndex(qBound(0, globalCfg.GetInt("DSi.Camera1.InputType"), 2));
+    txtCam1ImagePath->setText(globalCfg.GetQString("DSi.Camera1.ImagePath"));
+    QString dev1 = globalCfg.GetQString("DSi.Camera1.DeviceName");
+    if (!dev1.isEmpty()) {
+        int idx = cbxCam1Device->findData(dev1);
+        if (idx < 0) idx = cbxCam1Device->findText(dev1);
+        if (idx >= 0) cbxCam1Device->setCurrentIndex(idx);
+    }
+    swCam1XFlip->setChecked(globalCfg.GetBool("DSi.Camera1.XFlip"));
+
+    // RTC & Battery (System Page)
+    qint64 rtcOffset = localCfg0.GetInt64("RTC.Offset");
+    bool hasCustomRTC = (rtcOffset != 0);
+    swCustomRTC->setChecked(hasCustomRTC);
+    rtcContainer->setVisible(hasCustomRTC);
+    dteCustomRTC->setDateTime(hasCustomRTC
+        ? QDateTime::currentDateTime().addSecs(rtcOffset)
+        : QDateTime::currentDateTime());
+
+    bool dsBatOk = localCfg0.GetBool("DS.Battery.LevelOkay");
+    cbxDSBattery->setCurrentIndex(dsBatOk ? 0 : 1);
+
+    int dsiBat = localCfg0.GetInt("DSi.Battery.Level");
+    int dsiIdx = cbxDSiBattery->findData(dsiBat);
+    cbxDSiBattery->setCurrentIndex(dsiIdx >= 0 ? dsiIdx : 0);
+
+    swDSiCharging->setChecked(localCfg0.GetBool("DSi.Battery.Charging"));
 
     // CPU
     swJitEnable->setChecked(globalCfg.GetBool("JIT.Enable"));
@@ -1086,6 +1932,19 @@ void WatermelonSettingsDialog::loadSettings()
     else
         cbxShader->setCurrentIndex(0);
 
+    // Display
+    Config::Table winCfg = Config::GetLocalTable(0).GetTable("Window0");
+    cbxWindowSize->setCurrentIndex(qMax(0, cbxWindowSize->findData(2)));
+    cbxScreenRotation->setCurrentIndex(qMax(0, cbxScreenRotation->findData(winCfg.GetInt("ScreenRotation"))));
+    spnScreenGap->setValue(qBound(0, winCfg.GetInt("ScreenGap"), 500));
+    cbxScreenLayout->setCurrentIndex(qMax(0, cbxScreenLayout->findData(winCfg.GetInt("ScreenLayout"))));
+    cbxScreenSizing->setCurrentIndex(qMax(0, cbxScreenSizing->findData(winCfg.GetInt("ScreenSizing"))));
+    cbxScreenAspectTop->setCurrentIndex(qMax(0, cbxScreenAspectTop->findData(winCfg.GetInt("ScreenAspectTop"))));
+    cbxScreenAspectBot->setCurrentIndex(qMax(0, cbxScreenAspectBot->findData(winCfg.GetInt("ScreenAspectBot"))));
+    swScreenSwap->setChecked(winCfg.GetBool("ScreenSwap"));
+    swIntegerScaling->setChecked(winCfg.GetBool("IntegerScaling"));
+    swScreenFilter->setChecked(winCfg.GetBool("ScreenFilter"));
+
     // Audio
     int vol = globalCfg.GetInt("Audio.Volume");
     if (vol <= 0 && vol != 0) vol = 256;
@@ -1093,6 +1952,38 @@ void WatermelonSettingsDialog::loadSettings()
     int pct = qRound((vol / 256.0) * 100.0);
     lblVolumeVal->setText(tr("%1%").arg(pct));
     cbxInterpolation->setCurrentIndex(qBound(0, globalCfg.GetInt("Audio.Interpolation"), 3));
+    cbxBitDepth->setCurrentIndex(qBound(0, globalCfg.GetInt("Audio.BitDepth"), 2));
+    swDSiVolumeSync->setChecked(localCfg0.GetBool("Audio.DSiVolumeSync"));
+    cbxMicInputType->setCurrentIndex(qBound(0, globalCfg.GetInt("Mic.InputType"), 3));
+    QString micDev = globalCfg.GetQString("Mic.Device");
+    if (!micDev.isEmpty()) {
+        int idx = cbxMicDevice->findText(micDev);
+        if (idx >= 0) cbxMicDevice->setCurrentIndex(idx);
+    }
+    txtMicWavPath->setText(globalCfg.GetQString("Mic.WavPath"));
+
+    // Multiplayer & Network
+    cbxMPAudioMode->setCurrentIndex(qBound(0, globalCfg.GetInt("MP.AudioMode"), 2));
+    spnMPRecvTimeout->setValue(qBound(1, globalCfg.GetInt("MP.RecvTimeout"), 1000));
+
+    cbxNetAdapter->clear();
+    int selAdapter = 0;
+    std::string currentDev = globalCfg.GetString("LAN.Device");
+    for (int i = 0; i < (int)netAdapters.size(); i++)
+    {
+        cbxNetAdapter->addItem(QString::fromStdString(netAdapters[i].FriendlyName));
+        if (!strncmp(netAdapters[i].DeviceName, currentDev.c_str(), 128))
+            selAdapter = i;
+    }
+    if (!netAdapters.empty())
+        cbxNetAdapter->setCurrentIndex(selAdapter);
+
+    bool direct = globalCfg.GetBool("LAN.DirectMode");
+    rbDirectMode->setChecked(direct && hasNetPcap);
+    rbIndirectMode->setChecked(!direct || !hasNetPcap);
+    rbDirectMode->setEnabled(hasNetPcap);
+    updateNetAdapterControls();
+    onNetAdapterIndexChanged(cbxNetAdapter->currentIndex());
 
     // RetroAchievements
     swRAEnabled->setChecked(globalCfg.GetBool("RA.Enabled"));
@@ -1117,10 +2008,15 @@ void WatermelonSettingsDialog::loadSettings()
 void WatermelonSettingsDialog::saveSettings()
 {
     Config::Table globalCfg = Config::GetGlobalTable();
+    Config::Table localCfg0 = Config::GetLocalTable(0);
 
     // General
     globalCfg.SetBool("PauseLostFocus", swPauseLostFocus->isChecked());
     globalCfg.SetBool("Mouse.Hide", swMouseHide->isChecked());
+    globalCfg.SetInt("Mouse.HideSeconds", spnMouseHideSeconds->value());
+    globalCfg.SetDouble("TargetFPS", spnTargetFPS->value());
+    globalCfg.SetDouble("FastForwardFPS", spnFastForwardFPS->value());
+    globalCfg.SetDouble("SlowmoFPS", spnSlowmoFPS->value());
     globalCfg.SetBool("Emu.DirectBoot", swDirectBoot->isChecked());
 
     const QString oldUILang = globalCfg.GetQString("UI.Language");
@@ -1132,6 +2028,11 @@ void WatermelonSettingsDialog::saveSettings()
         dirList.append(listRomDirs->item(i)->text());
     }
     globalCfg.SetQString("WatermelonRomDirs", dirList.join(QLatin1Char(';')));
+
+    localCfg0.SetQString("SaveFilePath", txtSaveFilePath->text().trimmed());
+    localCfg0.SetQString("SavestatePath", txtSavestatePath->text().trimmed());
+    localCfg0.SetQString("CheatFilePath", txtCheatFilePath->text().trimmed());
+    globalCfg.SetBool("Savestate.RelocSRAM", swSavestateRelocSRAM->isChecked());
 
     // System
     globalCfg.SetInt("Emu.ConsoleType", cbxConsoleType->currentIndex());
@@ -1153,6 +2054,50 @@ void WatermelonSettingsDialog::saveSettings()
     firmCfg.SetInt("BirthdayMonth", cbxBirthMonth->currentIndex() + 1);
     firmCfg.SetQString("Message", txtMessage->text());
     firmCfg.SetBool("OverrideSettings", true);
+
+    // DSi options
+    globalCfg.SetBool("DSi.FullBIOSBoot", swDSiFullBIOSBoot->isChecked());
+    globalCfg.SetBool("DSi.DSP.HLE", swDSPHLE->isChecked());
+    globalCfg.SetBool("DSi.SD.Enable", swDSiSDEnable->isChecked());
+    globalCfg.SetQString("DSi.SD.ImagePath", txtDSiSDPath->text().trimmed());
+    globalCfg.SetInt("DSi.SD.ImageSize", cbxDSiSDSize->currentIndex());
+    globalCfg.SetBool("DSi.SD.ReadOnly", swDSiSDReadOnly->isChecked());
+    globalCfg.SetBool("DSi.SD.FolderSync", swDSiSDFolder->isChecked());
+    globalCfg.SetQString("DSi.SD.FolderPath", txtDSiSDFolder->text().trimmed());
+
+    // DLDI options
+    globalCfg.SetBool("DLDI.Enable", swDLDIEnable->isChecked());
+    globalCfg.SetQString("DLDI.ImagePath", txtDLDISDPath->text().trimmed());
+    globalCfg.SetInt("DLDI.ImageSize", cbxDLDISize->currentIndex());
+    globalCfg.SetBool("DLDI.ReadOnly", swDLDIReadOnly->isChecked());
+    globalCfg.SetBool("DLDI.FolderSync", swDLDIFolder->isChecked());
+    globalCfg.SetQString("DLDI.FolderPath", txtDLDIFolder->text().trimmed());
+
+    // DSi Cameras
+    globalCfg.SetInt("DSi.Camera0.InputType", cbxCam0Type->currentIndex());
+    globalCfg.SetQString("DSi.Camera0.ImagePath", txtCam0ImagePath->text().trimmed());
+    globalCfg.SetQString("DSi.Camera0.DeviceName", cbxCam0Device->count() > 0 ? cbxCam0Device->currentData().toString() : QString());
+    globalCfg.SetBool("DSi.Camera0.XFlip", swCam0XFlip->isChecked());
+
+    globalCfg.SetInt("DSi.Camera1.InputType", cbxCam1Type->currentIndex());
+    globalCfg.SetQString("DSi.Camera1.ImagePath", txtCam1ImagePath->text().trimmed());
+    globalCfg.SetQString("DSi.Camera1.DeviceName", cbxCam1Device->count() > 0 ? cbxCam1Device->currentData().toString() : QString());
+    globalCfg.SetBool("DSi.Camera1.XFlip", swCam1XFlip->isChecked());
+
+    // RTC & Battery (System Page)
+    if (swCustomRTC->isChecked())
+    {
+        qint64 offset = QDateTime::currentDateTime().secsTo(dteCustomRTC->dateTime());
+        localCfg0.SetInt64("RTC.Offset", offset);
+    }
+    else
+    {
+        localCfg0.SetInt64("RTC.Offset", 0);
+    }
+
+    localCfg0.SetBool("DS.Battery.LevelOkay", cbxDSBattery->currentData().toBool());
+    localCfg0.SetInt("DSi.Battery.Level", cbxDSiBattery->currentData().toInt());
+    localCfg0.SetBool("DSi.Battery.Charging", swDSiCharging->isChecked());
 
     // CPU
     globalCfg.SetBool("JIT.Enable", swJitEnable->isChecked());
@@ -1179,13 +2124,45 @@ void WatermelonSettingsDialog::saveSettings()
     }
     globalCfg.SetQString("WatermelonShader", shaderName);
 
+    // Display
+    Config::Table winCfg = Config::GetLocalTable(0).GetTable("Window0");
+    winCfg.SetInt("ScreenRotation", cbxScreenRotation->currentData().toInt());
+    winCfg.SetInt("ScreenGap", spnScreenGap->value());
+    winCfg.SetInt("ScreenLayout", cbxScreenLayout->currentData().toInt());
+    winCfg.SetInt("ScreenSizing", cbxScreenSizing->currentData().toInt());
+    winCfg.SetInt("ScreenAspectTop", cbxScreenAspectTop->currentData().toInt());
+    winCfg.SetInt("ScreenAspectBot", cbxScreenAspectBot->currentData().toInt());
+    winCfg.SetBool("ScreenSwap", swScreenSwap->isChecked());
+    winCfg.SetBool("IntegerScaling", swIntegerScaling->isChecked());
+    winCfg.SetBool("ScreenFilter", swScreenFilter->isChecked());
+
     // Audio
     globalCfg.SetInt("Audio.Volume", sldVolume->value());
     globalCfg.SetInt("Audio.Interpolation", cbxInterpolation->currentIndex());
+    globalCfg.SetInt("Audio.BitDepth", cbxBitDepth->currentIndex());
+    localCfg0.SetBool("Audio.DSiVolumeSync", swDSiVolumeSync->isChecked());
+    globalCfg.SetInt("Mic.InputType", cbxMicInputType->currentIndex());
+    globalCfg.SetQString("Mic.Device", cbxMicDevice->currentText());
+    globalCfg.SetQString("Mic.WavPath", txtMicWavPath->text().trimmed());
 
     // Controls
     if (inputConfigWidget) {
         inputConfigWidget->accept();
+    }
+
+    // Multiplayer & Network
+    globalCfg.SetInt("MP.AudioMode", cbxMPAudioMode->currentIndex());
+    globalCfg.SetInt("MP.RecvTimeout", spnMPRecvTimeout->value());
+    globalCfg.SetBool("LAN.DirectMode", rbDirectMode->isChecked());
+    int selAdapter = cbxNetAdapter->currentIndex();
+    if (selAdapter < 0 || selAdapter >= (int)netAdapters.size()) selAdapter = 0;
+    if (netAdapters.empty())
+    {
+        globalCfg.SetString("LAN.Device", "");
+    }
+    else
+    {
+        globalCfg.SetString("LAN.Device", netAdapters[selAdapter].DeviceName);
     }
 
     // RetroAchievements
@@ -1205,6 +2182,36 @@ void WatermelonSettingsDialog::saveSettings()
     }
 
     Config::Save();
+
+    // Reapply runtime camera configurations if instances exist
+    for (int i = 0; i < 2; i++)
+    {
+        if (camManager[i])
+        {
+            bool wasStarted = camManager[i]->isStarted();
+            if (wasStarted) camManager[i]->stop();
+            camManager[i]->deInit();
+            camManager[i]->init();
+            camManager[i]->setXFlip(i == 0 ? swCam0XFlip->isChecked() : swCam1XFlip->isChecked());
+            if (wasStarted) camManager[i]->start();
+        }
+    }
+
+    if (auto* mw = findMainWindow(this))
+    {
+        mw->applyScreenConfig();
+        mw->applyScreenSizeFactor(cbxWindowSize->currentData().toInt());
+        mw->applyMPSettings();
+        mw->applyInterfaceSettings();
+        mw->applyAudioSettings();
+    }
+    else
+    {
+        melonDS::MPInterface::Get().SetRecvTimeout(globalCfg.GetInt("MP.RecvTimeout"));
+    }
+
+    NetInit();
+
     emit settingsSaved();
 }
 
@@ -1238,7 +2245,12 @@ void WatermelonSettingsDialog::onResetDefaultsClicked()
     if (res == QMessageBox::Yes) {
         swPauseLostFocus->setChecked(true);
         swMouseHide->setChecked(true);
+        spnMouseHideSeconds->setValue(5);
+        spnTargetFPS->setValue(60.0);
+        spnFastForwardFPS->setValue(120.0);
+        spnSlowmoFPS->setValue(30.0);
         swDirectBoot->setChecked(true);
+        swSavestateRelocSRAM->setChecked(false);
         cbxConsoleType->setCurrentIndex(0);
         swExternalBios->setChecked(false);
         biosFilesContainer->setVisible(false);
@@ -1256,11 +2268,69 @@ void WatermelonSettingsDialog::onResetDefaultsClicked()
         swSoftThreaded->setChecked(true);
         sldVolume->setValue(256);
         cbxInterpolation->setCurrentIndex(1);
+        cbxBitDepth->setCurrentIndex(0);
+        swDSiVolumeSync->setChecked(false);
+        cbxMicInputType->setCurrentIndex(1);
+        txtMicWavPath->clear();
+        micDeviceContainer->setVisible(true);
+        micWavContainer->setVisible(false);
+        cbxWindowSize->setCurrentIndex(1); // 2x
+        cbxScreenRotation->setCurrentIndex(0); // 0°
+        spnScreenGap->setValue(0);
+        cbxScreenLayout->setCurrentIndex(0); // Natural
+        cbxScreenSizing->setCurrentIndex(0); // Even
+        cbxScreenAspectTop->setCurrentIndex(0); // 4:3
+        cbxScreenAspectBot->setCurrentIndex(0); // 4:3
+        swScreenSwap->setChecked(false);
+        swIntegerScaling->setChecked(false);
+        swScreenFilter->setChecked(true);
+        swCustomRTC->setChecked(false);
+        dteCustomRTC->setDateTime(QDateTime::currentDateTime());
+        rtcContainer->setVisible(false);
+        cbxDSBattery->setCurrentIndex(0);
+        cbxDSiBattery->setCurrentIndex(0);
+        swDSiCharging->setChecked(true);
+        cbxCam0Type->setCurrentIndex(0);
+        txtCam0ImagePath->clear();
+        swCam0XFlip->setChecked(false);
+        cam0ImageContainer->setVisible(false);
+        cam0DeviceContainer->setVisible(false);
+        cbxCam1Type->setCurrentIndex(0);
+        txtCam1ImagePath->clear();
+        swCam1XFlip->setChecked(false);
+        cam1ImageContainer->setVisible(false);
+        cam1DeviceContainer->setVisible(false);
         swRAHardcore->setChecked(true);
         swRARichPresence->setChecked(true);
         swRASound->setChecked(true);
         swRAUnofficial->setChecked(false);
         swRAEncore->setChecked(false);
+        cbxMPAudioMode->setCurrentIndex(1);
+        spnMPRecvTimeout->setValue(25);
+        rbIndirectMode->setChecked(true);
+        rbDirectMode->setChecked(false);
+        updateNetAdapterControls();
+        swDSiFullBIOSBoot->setChecked(false);
+        swDSPHLE->setChecked(true);
+        swDSiSDEnable->setChecked(false);
+        dsiSDContainer->setVisible(false);
+        txtDSiSDPath->setText(QStringLiteral("dsisd.bin"));
+        cbxDSiSDSize->setCurrentIndex(0);
+        swDSiSDReadOnly->setChecked(false);
+        swDSiSDFolder->setChecked(false);
+        dsiSDFolderContainer->setVisible(false);
+        txtDSiSDFolder->clear();
+        swDLDIEnable->setChecked(false);
+        dldiContainer->setVisible(false);
+        txtDLDISDPath->setText(QStringLiteral("dldi.bin"));
+        cbxDLDISize->setCurrentIndex(0);
+        swDLDIReadOnly->setChecked(false);
+        swDLDIFolder->setChecked(false);
+        dldiFolderContainer->setVisible(false);
+        txtDLDIFolder->clear();
+        txtSaveFilePath->clear();
+        txtSavestatePath->clear();
+        txtCheatFilePath->clear();
     }
 }
 

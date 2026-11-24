@@ -33,6 +33,8 @@
 #include <QMenuBar>
 #include <QMimeDatabase>
 #include <QFileDialog>
+#include <QFile>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QPaintEvent>
 #include <QPainter>
@@ -86,6 +88,7 @@
 #include "WatermelonRADialog.h"
 #include "WatermelonSettingsDialog.h"
 #include "WatermelonFloatingBar.h"
+#include "WatermelonGameDialog.h"
 
 using namespace melonDS;
 
@@ -314,48 +317,6 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
 
             actEjectCart = menu->addAction("Eject cart");
             connect(actEjectCart, &QAction::triggered, this, &MainWindow::onEjectCart);
-
-            menu->addSeparator();
-
-            actCurrentGBACart = menu->addAction("GBA slot: " + emuInstance->gbaCartLabel());
-            actCurrentGBACart->setEnabled(false);
-
-            actInsertGBACart = menu->addAction("Insert ROM cart...");
-            connect(actInsertGBACart, &QAction::triggered, this, &MainWindow::onInsertGBACart);
-
-            {
-                QMenu * submenu = menu->addMenu("Insert add-on cart");
-                QAction *act;
-
-                int addons[] = {
-                    GBAAddon_RAMExpansion,
-                    GBAAddon_RumblePak,
-                    GBAAddon_SolarSensorBoktai1,
-                    GBAAddon_SolarSensorBoktai2,
-                    GBAAddon_SolarSensorBoktai3,
-                    GBAAddon_MotionPakHomebrew,
-                    GBAAddon_MotionPakRetail,
-                    GBAAddon_GuitarGrip,
-                    -1
-                };
-
-                for (int i = 0; addons[i] != -1; i++)
-                {
-                    int addon = addons[i];
-                    act = submenu->addAction(emuInstance->gbaAddonName(addon));
-                    act->setData(QVariant(addon));
-                    connect(act, &QAction::triggered, this, &MainWindow::onInsertGBAAddon);
-                    actInsertGBAAddon.append(act);
-                }
-            }
-
-            actEjectGBACart = menu->addAction("Eject cart");
-            connect(actEjectGBACart, &QAction::triggered, this, &MainWindow::onEjectGBACart);
-
-            menu->addSeparator();
-
-            actImportSavefile = menu->addAction("Import savefile");
-            connect(actImportSavefile, &QAction::triggered, this, &MainWindow::onImportSavefile);
 
             menu->addSeparator();
 
@@ -709,7 +670,15 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
         }
 
         setMenuBar(menubar);
+        menubar->setVisible(false);
         menubar->setFixedHeight(0);
+
+        // Bind all actions to MainWindow so hotkeys and shortcuts (F1-F8, F4, F11, F12, etc.) still work without the menubar
+        for (auto* act : menubar->findChildren<QAction*>())
+        {
+            act->setShortcutContext(Qt::WindowShortcut);
+            this->addAction(act);
+        }
 
         if (localCfg.GetString("Firmware.Username") == "Arisotura")
             actMPNewInstance->setText("Fart");
@@ -748,9 +717,55 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
     {
         launcher = new WatermelonLauncher(this);
         connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
-            preloadROMs({path}, {}, true);
+            WatermelonGBAConfig gba = WatermelonGameDialog::takePendingGBAConfig();
+            WatermelonScreenConfig scr = WatermelonGameDialog::takePendingScreenConfig();
+            if (scr.rotation >= 0) windowCfg.SetInt("ScreenRotation", scr.rotation);
+            if (scr.gap >= 0) windowCfg.SetInt("ScreenGap", scr.gap);
+            if (scr.layout >= 0) windowCfg.SetInt("ScreenLayout", scr.layout);
+            if (scr.sizing >= 0) windowCfg.SetInt("ScreenSizing", scr.sizing);
+            if (scr.aspectTop >= 0) windowCfg.SetInt("ScreenAspectTop", scr.aspectTop);
+            if (scr.aspectBot >= 0) windowCfg.SetInt("ScreenAspectBot", scr.aspectBot);
+            if (scr.swap >= 0) windowCfg.SetBool("ScreenSwap", scr.swap == 1);
+            if (scr.integerScaling >= 0) windowCfg.SetBool("IntegerScaling", scr.integerScaling == 1);
+            if (scr.filter >= 0) windowCfg.SetBool("ScreenFilter", scr.filter == 1);
+
+            applyScreenConfig();
+            if (scr.sizeFactor > 0) applyScreenSizeFactor(scr.sizeFactor);
+
+            QStringList gbaFiles;
+            if (!gba.cartPath.isEmpty() && QFile::exists(gba.cartPath))
+                gbaFiles << gba.cartPath;
+
+            if (!preloadROMs({path}, gbaFiles, true))
+                return;
+
+            if (gba.addon > 0)
+            {
+                static const int addons[] = {
+                    GBAAddon_RAMExpansion,
+                    GBAAddon_RumblePak,
+                    GBAAddon_SolarSensorBoktai1,
+                    GBAAddon_SolarSensorBoktai2,
+                    GBAAddon_SolarSensorBoktai3,
+                    GBAAddon_MotionPakHomebrew,
+                    GBAAddon_MotionPakRetail,
+                    GBAAddon_GuitarGrip
+                };
+                QString errorstr;
+                if (!emuThread->insertGBAAddon(addons[gba.addon - 1], errorstr))
+                    QMessageBox::warning(this, "melonDS", errorstr);
+            }
+
+            if (!gba.importSavePath.isEmpty() && QFile::exists(gba.importSavePath))
+                emuThread->importSavefile(gba.importSavePath);
         });
         connect(launcher, &WatermelonLauncher::openFileRequested, this, &MainWindow::onOpenFile);
+        connect(launcher, &WatermelonLauncher::bootFirmwareRequested, this, &MainWindow::onBootFirmware);
+        connect(launcher, &WatermelonLauncher::mpNewInstanceRequested, this, &MainWindow::onMPNewInstance);
+        connect(launcher, &WatermelonLauncher::lanStartHostRequested, this, &MainWindow::onLANStartHost);
+        connect(launcher, &WatermelonLauncher::lanStartClientRequested, this, &MainWindow::onLANStartClient);
+        connect(launcher, &WatermelonLauncher::mpSettingsRequested, this, &MainWindow::onOpenMPSettings);
+        connect(launcher, &WatermelonLauncher::settingsCategoryRequested, this, &MainWindow::onOpenUnifiedSettingsCategory);
 
         if (!emuThread || !emuThread->emuIsActive())
         {
@@ -765,14 +780,6 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
     if (hasMenu)
     {
         actEjectCart->setEnabled(false);
-        actEjectGBACart->setEnabled(false);
-
-        if (globalCfg.GetInt("Emu.ConsoleType") == 1)
-        {
-            actInsertGBACart->setEnabled(false);
-            for (auto act: actInsertGBAAddon)
-                act->setEnabled(false);
-        }
 
         for (int i = 0; i < 9; i++)
         {
@@ -780,7 +787,6 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
             actLoadState[i]->setEnabled(false);
         }
         actUndoStateLoad->setEnabled(false);
-        actImportSavefile->setEnabled(false);
 
         actPause->setEnabled(false);
         actReset->setEnabled(false);
@@ -973,6 +979,22 @@ void MainWindow::createScreenPanel()
         connect(floatingBar, &WatermelonFloatingBar::stopRequested, this, &MainWindow::onStop);
         connect(floatingBar, &WatermelonFloatingBar::settingsRequested, this, &MainWindow::onOpenUnifiedSettings);
         connect(floatingBar, &WatermelonFloatingBar::fullscreenRequested, this, &MainWindow::toggleFullscreen);
+        connect(floatingBar, &WatermelonFloatingBar::saveStateRequested, this, &MainWindow::onFloatingSaveState);
+        connect(floatingBar, &WatermelonFloatingBar::loadStateRequested, this, &MainWindow::onFloatingLoadState);
+        connect(floatingBar, &WatermelonFloatingBar::undoStateLoadRequested, this, &MainWindow::onUndoStateLoad);
+        connect(floatingBar, &WatermelonFloatingBar::undoStateSaveRequested, this, &MainWindow::onUndoStateSave);
+
+        floatingBar->setStateSlotInfoProvider([this](int slot) -> QString {
+            if (slot <= 0 || !emuInstance)
+                return QString();
+
+            QString filename = QString::fromStdString(emuInstance->getSavestateName(slot));
+            QFileInfo fi(filename);
+            if (!fi.exists())
+                return QString();
+
+            return fi.lastModified().toString(QStringLiteral("dd/MM/yyyy HH:mm"));
+        });
     }
 
     connect(this, SIGNAL(screenLayoutChange()), panel, SLOT(onScreenLayoutChanged()));
@@ -1397,15 +1419,8 @@ void MainWindow::updateCartInserted(bool gba)
     QString label;
     if (gba)
     {
-        inserted = emuInstance->gbaCartInserted() && (emuInstance->getConsoleType() == 0);
-        label = "GBA slot: " + emuInstance->gbaCartLabel();
-
-        emuInstance->doOnAllWindows([=](MainWindow* win)
-        {
-            if (!win->hasMenu) return;
-            win->actCurrentGBACart->setText(label);
-            win->actEjectGBACart->setEnabled(inserted);
-        });
+        // GBA slot is configured per game in the launcher's game dialog.
+        return;
     }
     else
     {
@@ -1417,7 +1432,6 @@ void MainWindow::updateCartInserted(bool gba)
             if (!win->hasMenu) return;
             win->actCurrentCart->setText(label);
             win->actEjectCart->setEnabled(inserted);
-            win->actImportSavefile->setEnabled(inserted);
             win->actEnableCheats->setEnabled(inserted);
             win->actSetupCheats->setEnabled(inserted);
             win->actROMInfo->setEnabled(inserted);
@@ -1636,8 +1650,16 @@ void MainWindow::onEjectGBACart()
 
 void MainWindow::onSaveState()
 {
-    int slot = ((QAction*)sender())->data().toInt();
+    saveStateToSlot(((QAction*)sender())->data().toInt());
+}
 
+void MainWindow::onFloatingSaveState(int slot)
+{
+    saveStateToSlot(slot);
+}
+
+void MainWindow::saveStateToSlot(int slot)
+{
     QString filename;
     if (slot > 0)
     {
@@ -1656,12 +1678,27 @@ void MainWindow::onSaveState()
             return;
     }
 
+    QByteArray previousContents;
+    bool hadPreviousFile = QFile::exists(filename);
+    if (hadPreviousFile)
+    {
+        QFile previous(filename);
+        if (previous.open(QIODevice::ReadOnly))
+            previousContents = previous.readAll();
+    }
+
     if (emuThread->saveState(filename))
     {
         if (slot > 0) emuInstance->osdAddMessage(0, "State saved to slot %d", slot);
         else          emuInstance->osdAddMessage(0, "State saved to file");
 
-        actLoadState[slot]->setEnabled(true);
+        lastSavedStateFile = filename;
+        lastSavedStateBackup = previousContents;
+        lastSavedStateHadFile = hadPreviousFile;
+        lastSavedStateSlot = slot;
+
+        if (slot > 0 && actLoadState[slot])
+            actLoadState[slot]->setEnabled(true);
     }
     else
     {
@@ -1669,10 +1706,52 @@ void MainWindow::onSaveState()
     }
 }
 
+void MainWindow::onUndoStateSave()
+{
+    if (lastSavedStateFile.isEmpty())
+    {
+        emuInstance->osdAddMessage(0xFFA0A0, "There is no saved state to undo");
+        return;
+    }
+
+    bool ok = false;
+    if (lastSavedStateHadFile)
+    {
+        QFile file(lastSavedStateFile);
+        if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+            ok = (file.write(lastSavedStateBackup) == lastSavedStateBackup.size());
+    }
+    else
+    {
+        ok = QFile::remove(lastSavedStateFile);
+    }
+
+    if (ok)
+        emuInstance->osdAddMessage(0, "State save undone");
+    else
+        emuInstance->osdAddMessage(0xFFA0A0, "Could not undo state save");
+
+    if (lastSavedStateSlot > 0 && actLoadState[lastSavedStateSlot])
+        actLoadState[lastSavedStateSlot]->setEnabled(lastSavedStateHadFile);
+
+    lastSavedStateFile.clear();
+    lastSavedStateBackup.clear();
+    lastSavedStateHadFile = false;
+    lastSavedStateSlot = 0;
+}
+
 void MainWindow::onLoadState()
 {
-    int slot = ((QAction*)sender())->data().toInt();
+    loadStateFromSlot(((QAction*)sender())->data().toInt());
+}
 
+void MainWindow::onFloatingLoadState(int slot)
+{
+    loadStateFromSlot(slot);
+}
+
+void MainWindow::loadStateFromSlot(int slot)
+{
     QString filename;
     if (slot > 0)
     {
@@ -1929,25 +2008,8 @@ void MainWindow::onOpenEmuSettings()
 
 void MainWindow::onEmuSettingsDialogFinished(int res)
 {
-    if (globalCfg.GetInt("Emu.ConsoleType") == 1)
-    {
-        actInsertGBACart->setEnabled(false);
-        for (auto act : actInsertGBAAddon)
-            act->setEnabled(false);
-        actEjectGBACart->setEnabled(false);
-    }
-    else
-    {
-        actInsertGBACart->setEnabled(true);
-        for (auto act : actInsertGBAAddon)
-            act->setEnabled(true);
-        actEjectGBACart->setEnabled(emuInstance->gbaCartInserted());
-    }
-
     if (EmuSettingsDialog::needsReset)
         onReset();
-
-    actCurrentGBACart->setText("GBA slot: " + emuInstance->gbaCartLabel());
 
     if (!emuThread->emuIsActive())
         actTitleManager->setEnabled(!globalCfg.GetString("DSi.NANDPath").empty());
@@ -1957,8 +2019,13 @@ void MainWindow::onEmuSettingsDialogFinished(int res)
 
 void MainWindow::onOpenUnifiedSettings()
 {
+    onOpenUnifiedSettingsCategory(0);
+}
+
+void MainWindow::onOpenUnifiedSettingsCategory(int initialCategory)
+{
     emuThread->emuPause();
-    WatermelonSettingsDialog dlg(this);
+    WatermelonSettingsDialog dlg(this, initialCategory);
     connect(&dlg, &WatermelonSettingsDialog::settingsSaved, this, [this]() {
         if (launcher) launcher->refresh();
     });
@@ -1987,15 +2054,7 @@ void MainWindow::onOpenVideoSettings()
 
 void MainWindow::onOpenCameraSettings()
 {
-    emuThread->emuPause();
-
-    camStarted[0] = camManager[0]->isStarted();
-    camStarted[1] = camManager[1]->isStarted();
-    if (camStarted[0]) camManager[0]->stop();
-    if (camStarted[1]) camManager[1]->stop();
-
-    CameraSettingsDialog* dlg = CameraSettingsDialog::openDlg(this);
-    connect(dlg, &CameraSettingsDialog::finished, this, &MainWindow::onCameraSettingsFinished);
+    onOpenUnifiedSettingsCategory(1);
 }
 
 void MainWindow::onCameraSettingsFinished(int res)
@@ -2008,12 +2067,7 @@ void MainWindow::onCameraSettingsFinished(int res)
 
 void MainWindow::onOpenAudioSettings()
 {
-    AudioSettingsDialog* dlg = AudioSettingsDialog::openDlg(this);
-    connect(emuThread, &EmuThread::syncVolumeLevel, dlg, &AudioSettingsDialog::onSyncVolumeLevel);
-    connect(emuThread, &EmuThread::windowEmuStart, dlg, &AudioSettingsDialog::onConsoleReset);
-    connect(dlg, &AudioSettingsDialog::updateAudioVolume, this, &MainWindow::onUpdateAudioVolume);
-    connect(dlg, &AudioSettingsDialog::updateAudioSettings, this, &MainWindow::onUpdateAudioSettings);
-    connect(dlg, &AudioSettingsDialog::finished, this, &MainWindow::onAudioSettingsFinished);
+    onOpenUnifiedSettingsCategory(5);
 }
 
 void MainWindow::onOpenFirmwareSettings()
@@ -2034,10 +2088,7 @@ void MainWindow::onFirmwareSettingsFinished(int res)
 
 void MainWindow::onOpenPathSettings()
 {
-    emuThread->emuPause();
-
-    PathSettingsDialog* dlg = PathSettingsDialog::openDlg(this);
-    connect(dlg, &PathSettingsDialog::finished, this, &MainWindow::onPathSettingsFinished);
+    onOpenUnifiedSettingsCategory(0);
 }
 
 void MainWindow::onPathSettingsFinished(int res)
@@ -2076,10 +2127,7 @@ void MainWindow::onAudioSettingsFinished(int res)
 
 void MainWindow::onOpenMPSettings()
 {
-    emuThread->emuPause();
-
-    MPSettingsDialog* dlg = MPSettingsDialog::openDlg(this);
-    connect(dlg, &MPSettingsDialog::finished, this, &MainWindow::onMPSettingsFinished);
+    onOpenUnifiedSettingsCategory(7);
 }
 
 void MainWindow::onMPSettingsFinished(int res)
@@ -2093,10 +2141,7 @@ void MainWindow::onMPSettingsFinished(int res)
 
 void MainWindow::onOpenWifiSettings()
 {
-    emuThread->emuPause();
-
-    WifiSettingsDialog* dlg = WifiSettingsDialog::openDlg(this);
-    connect(dlg, &WifiSettingsDialog::finished, this, &MainWindow::onWifiSettingsFinished);
+    onOpenUnifiedSettingsCategory(7);
 }
 
 void MainWindow::onWifiSettingsFinished(int res)
@@ -2109,10 +2154,7 @@ void MainWindow::onWifiSettingsFinished(int res)
 
 void MainWindow::onOpenInterfaceSettings()
 {
-    emuThread->emuPause();
-    InterfaceSettingsDialog* dlg = InterfaceSettingsDialog::openDlg(this);
-    connect(dlg, &InterfaceSettingsDialog::finished, this, &MainWindow::onInterfaceSettingsFinished);
-    connect(dlg, &InterfaceSettingsDialog::updateInterfaceSettings, this, &MainWindow::onUpdateInterfaceSettings);
+    onOpenUnifiedSettingsCategory(0);
 }
 
 void MainWindow::onUpdateInterfaceSettings()
@@ -2136,6 +2178,94 @@ void MainWindow::onInterfaceSettingsFinished(int res)
 void MainWindow::onChangeSavestateSRAMReloc(bool checked)
 {
     globalCfg.SetBool("Savestate.RelocSRAM", checked);
+}
+
+void MainWindow::applyScreenConfig()
+{
+    if (hasMenu)
+    {
+        int rotation = windowCfg.GetInt("ScreenRotation");
+        if (rotation >= 0 && rotation < screenRot_MAX)
+            actScreenRotation[rotation]->setChecked(true);
+
+        int screenGapValue = windowCfg.GetInt("ScreenGap");
+        bool gapFound = false;
+        for (int i = 0; i < 6; i++)
+        {
+            if (actScreenGap[i]->data().toInt() == screenGapValue)
+            {
+                actScreenGap[i]->setChecked(true);
+                gapFound = true;
+                break;
+            }
+        }
+        if (!gapFound)
+        {
+            for (int i = 0; i < 6; i++)
+                actScreenGap[i]->setChecked(false);
+        }
+
+        int layout = windowCfg.GetInt("ScreenLayout");
+        if (layout >= 0 && layout < screenLayout_MAX)
+            actScreenLayout[layout]->setChecked(true);
+
+        int sizing = windowCfg.GetInt("ScreenSizing");
+        if (sizing >= 0 && sizing < screenSizing_MAX)
+            actScreenSizing[sizing]->setChecked(true);
+
+        actIntegerScaling->setChecked(windowCfg.GetBool("IntegerScaling"));
+        actScreenSwap->setChecked(windowCfg.GetBool("ScreenSwap"));
+
+        int aspectTop = windowCfg.GetInt("ScreenAspectTop");
+        int aspectBot = windowCfg.GetInt("ScreenAspectBot");
+        for (int i = 0; i < AspectRatiosNum; i++)
+        {
+            actScreenAspectTop[i]->setChecked(aspectTop == aspectRatios[i].id);
+            actScreenAspectBot[i]->setChecked(aspectBot == aspectRatios[i].id);
+        }
+
+        actScreenFiltering->setChecked(windowCfg.GetBool("ScreenFilter"));
+    }
+
+    if (panel)
+        panel->setFilter(windowCfg.GetBool("ScreenFilter"));
+
+    emit screenLayoutChange();
+}
+
+void MainWindow::applyScreenSizeFactor(int factor)
+{
+    if (!panel || factor < 1)
+        return;
+
+    QSize diff = size() - panel->size();
+    resize(panel->screenGetMinSize(factor) + diff);
+}
+
+void MainWindow::applyMPSettings()
+{
+    if (emuInstance)
+    {
+        emuInstance->mpAudioMode = globalCfg.GetInt("MP.AudioMode");
+        emuInstance->audioMute();
+    }
+    melonDS::MPInterface::Get().SetRecvTimeout(globalCfg.GetInt("MP.RecvTimeout"));
+}
+
+void MainWindow::applyInterfaceSettings()
+{
+    onUpdateInterfaceSettings();
+}
+
+void MainWindow::applyAudioSettings()
+{
+    onUpdateAudioSettings();
+    if (emuInstance)
+    {
+        emuInstance->audioVolume = globalCfg.GetInt("Audio.Volume");
+        emuInstance->audioDSiVolumeSync = localCfg.GetBool("Audio.DSiVolumeSync");
+        emuInstance->audioUpdateSettings();
+    }
 }
 
 void MainWindow::onChangeScreenSize()
@@ -2292,17 +2422,10 @@ void MainWindow::toggleFullscreen()
     if (!isFullScreen())
     {
         showFullScreen();
-        if (hasMenu)
-            menuBar()->setFixedHeight(0); // Don't use hide() as menubar actions stop working
     }
     else
     {
         showNormal();
-        if (hasMenu)
-        {
-            int menuBarHeight = menuBar()->sizeHint().height();
-            menuBar()->setFixedHeight(menuBarHeight);
-        }
     }
 }
 
@@ -2335,10 +2458,6 @@ void MainWindow::onEmuStart()
         floatingBar->setEmuPaused(false);
         updateFloatingBarPos();
         floatingBar->showBar();
-    }
-    if (hasMenu)
-    {
-        menuBar()->hide();
     }
     if (!hasMenu) return;
 
@@ -2426,6 +2545,7 @@ void MainWindow::onScreenMouseMoved(const QPoint& pos)
 void MainWindow::updateFloatingBarPos()
 {
     if (!floatingBar) return;
+    floatingBar->updateForWindowWidth(width());
     floatingBar->adjustSize();
     int x = std::max(0, (width() - floatingBar->width()) / 2);
     int y = 6;
@@ -2543,11 +2663,7 @@ void MainWindow::onUpdateVideoSettings(bool glchange)
 void MainWindow::showLauncher()
 {
     if (floatingBar) floatingBar->hideBar();
-
-    if (hasMenu)
-    {
-        menuBar()->hide();
-    }
+    if (hasOGL) glContextDirty = true;
 
     if (centralWidget() == launcher && launcher != nullptr)
     {
@@ -2566,9 +2682,55 @@ void MainWindow::showLauncher()
     {
         launcher = new WatermelonLauncher(this);
         connect(launcher, &WatermelonLauncher::romSelected, this, [this](const QString& path) {
-            preloadROMs({path}, {}, true);
+            WatermelonGBAConfig gba = WatermelonGameDialog::takePendingGBAConfig();
+            WatermelonScreenConfig scr = WatermelonGameDialog::takePendingScreenConfig();
+            if (scr.rotation >= 0) windowCfg.SetInt("ScreenRotation", scr.rotation);
+            if (scr.gap >= 0) windowCfg.SetInt("ScreenGap", scr.gap);
+            if (scr.layout >= 0) windowCfg.SetInt("ScreenLayout", scr.layout);
+            if (scr.sizing >= 0) windowCfg.SetInt("ScreenSizing", scr.sizing);
+            if (scr.aspectTop >= 0) windowCfg.SetInt("ScreenAspectTop", scr.aspectTop);
+            if (scr.aspectBot >= 0) windowCfg.SetInt("ScreenAspectBot", scr.aspectBot);
+            if (scr.swap >= 0) windowCfg.SetBool("ScreenSwap", scr.swap == 1);
+            if (scr.integerScaling >= 0) windowCfg.SetBool("IntegerScaling", scr.integerScaling == 1);
+            if (scr.filter >= 0) windowCfg.SetBool("ScreenFilter", scr.filter == 1);
+
+            applyScreenConfig();
+            if (scr.sizeFactor > 0) applyScreenSizeFactor(scr.sizeFactor);
+
+            QStringList gbaFiles;
+            if (!gba.cartPath.isEmpty() && QFile::exists(gba.cartPath))
+                gbaFiles << gba.cartPath;
+
+            if (!preloadROMs({path}, gbaFiles, true))
+                return;
+
+            if (gba.addon > 0)
+            {
+                static const int addons[] = {
+                    GBAAddon_RAMExpansion,
+                    GBAAddon_RumblePak,
+                    GBAAddon_SolarSensorBoktai1,
+                    GBAAddon_SolarSensorBoktai2,
+                    GBAAddon_SolarSensorBoktai3,
+                    GBAAddon_MotionPakHomebrew,
+                    GBAAddon_MotionPakRetail,
+                    GBAAddon_GuitarGrip
+                };
+                QString errorstr;
+                if (!emuThread->insertGBAAddon(addons[gba.addon - 1], errorstr))
+                    QMessageBox::warning(this, "melonDS", errorstr);
+            }
+
+            if (!gba.importSavePath.isEmpty() && QFile::exists(gba.importSavePath))
+                emuThread->importSavefile(gba.importSavePath);
         });
         connect(launcher, &WatermelonLauncher::openFileRequested, this, &MainWindow::onOpenFile);
+        connect(launcher, &WatermelonLauncher::bootFirmwareRequested, this, &MainWindow::onBootFirmware);
+        connect(launcher, &WatermelonLauncher::mpNewInstanceRequested, this, &MainWindow::onMPNewInstance);
+        connect(launcher, &WatermelonLauncher::lanStartHostRequested, this, &MainWindow::onLANStartHost);
+        connect(launcher, &WatermelonLauncher::lanStartClientRequested, this, &MainWindow::onLANStartClient);
+        connect(launcher, &WatermelonLauncher::mpSettingsRequested, this, &MainWindow::onOpenMPSettings);
+        connect(launcher, &WatermelonLauncher::settingsCategoryRequested, this, &MainWindow::onOpenUnifiedSettingsCategory);
     }
 
     setCentralWidget(launcher);
@@ -2591,11 +2753,25 @@ void MainWindow::showEmulator()
         setCentralWidget(panel);
         panel->show();
         panel->raise();
-        emit screenLayoutChange();
-    }
 
-    if (hasMenu)
-    {
-        menuBar()->hide();
+        if (glContextDirty)
+        {
+            glContextDirty = false;
+
+            if (hasOGL)
+            {
+                // El panel estuvo oculto mientras se mostraba el launcher.
+                // En Wayland eso destruye la superficie nativa para la que se
+                // creó el contexto GL, dejando el panel en negro al volver.
+                emuThread->emuPause();
+                emuThread->deinitContext(windowID);
+                createScreenPanel();
+                if (hasOGL)
+                    emuThread->initContext(windowID);
+                emuThread->emuUnpause();
+            }
+        }
+
+        emit screenLayoutChange();
     }
 }

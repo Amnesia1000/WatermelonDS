@@ -44,10 +44,18 @@ public:
 signals:
     void romSelected(const QString& filePath);
     void openFileRequested();
+    void bootFirmwareRequested();
+    void mpNewInstanceRequested();
+    void lanStartHostRequested();
+    void lanStartClientRequested();
+    void mpSettingsRequested();
+    void settingsCategoryRequested(int category);
 
 private slots:
     void onSearchTextChanged(const QString& text);
     void onOpenClicked();
+    void onBootFirmwareClicked();
+    void onMultiplayerClicked();
     void onAddDirectoryClicked();
     void onRefreshClicked();
     void onShadersClicked();
@@ -81,6 +89,8 @@ private:
     QLabel* titleLogo = nullptr;
     QLineEdit* searchInput = nullptr;
     QPushButton* btnOpen = nullptr;
+    QPushButton* btnBootFirmware = nullptr;
+    QPushButton* btnMultiplayer = nullptr;
     QPushButton* btnShaders = nullptr;
     QPushButton* btnRA = nullptr;
     QPushButton* btnSettings = nullptr;

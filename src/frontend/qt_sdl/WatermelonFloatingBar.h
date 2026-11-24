@@ -2,6 +2,7 @@
 #define WATERMELONFLOATINGBAR_H
 
 #include <QWidget>
+#include <functional>
 
 class QLabel;
 class QPushButton;
@@ -20,6 +21,13 @@ public:
     void showBar();
     void hideBar();
     void pingHover();
+    void updateForWindowWidth(int windowWidth);
+    void setCompactMode(bool compact);
+    bool isCompactMode() const { return isCompact; }
+
+    // Returns a short description (e.g. date/time) for the given state slot,
+    // or an empty string if the slot is empty.
+    void setStateSlotInfoProvider(std::function<QString(int)> provider);
 
 signals:
     void pauseRequested(bool pause);
@@ -28,6 +36,10 @@ signals:
     void stopRequested();
     void settingsRequested();
     void fullscreenRequested();
+    void saveStateRequested(int slot);
+    void loadStateRequested(int slot);
+    void undoStateLoadRequested();
+    void undoStateSaveRequested();
 
 protected:
     void paintEvent(QPaintEvent* event) override;
@@ -39,18 +51,28 @@ private slots:
     void onFrameStepClicked();
     void onResetClicked();
     void onStopClicked();
+    void onSaveStateClicked();
+    void onLoadStateClicked();
 
 private:
+    void refreshButtonTexts();
+
     QLabel*      lblStatus        = nullptr;
     QPushButton* btnPause         = nullptr;
     QPushButton* btnFrameStep     = nullptr;
     QPushButton* btnReset         = nullptr;
+    QPushButton* btnSaveState     = nullptr;
+    QPushButton* btnLoadState     = nullptr;
     QPushButton* btnStop          = nullptr;
     QPushButton* btnSettings      = nullptr;
     QPushButton* btnFullscreen    = nullptr;
 
     QTimer* hideTimer = nullptr;
     bool isPaused = false;
+    bool isCompact = false;
+    bool initialized = false;
+    bool stateMenuOpen = false;
+    std::function<QString(int)> stateSlotInfoProvider;
 };
 
 #endif // WATERMELONFLOATINGBAR_H

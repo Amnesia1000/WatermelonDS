@@ -27,6 +27,7 @@
 #include <QWindow>
 #include <QMainWindow>
 #include <QImage>
+#include <QByteArray>
 #include <QActionGroup>
 #include <QTimer>
 #include <QMutex>
@@ -145,6 +146,13 @@ public:
     void showLauncher();
     void showEmulator();
 
+    // Reapplies windowCfg screen settings to the panel/menu after external edits.
+    void applyScreenConfig();
+    void applyScreenSizeFactor(int factor);
+    void applyMPSettings();
+    void applyInterfaceSettings();
+    void applyAudioSettings();
+
     // called when the MP interface is changed
     void updateMPInterface(melonDS::MPInterfaceType type);
 
@@ -181,6 +189,9 @@ private slots:
     void onSaveState();
     void onLoadState();
     void onUndoStateLoad();
+    void onUndoStateSave();
+    void onFloatingSaveState(int slot);
+    void onFloatingLoadState(int slot);
     void onImportSavefile();
     void onQuit();
 
@@ -204,6 +215,7 @@ private slots:
     void onNPTest();
 
     void onOpenUnifiedSettings();
+    void onOpenUnifiedSettingsCategory(int initialCategory);
     void onOpenEmuSettings();
     void onEmuSettingsDialogFinished(int res);
     void onOpenInputConfig();
@@ -259,8 +271,15 @@ private slots:
 private:
     virtual void closeEvent(QCloseEvent* event) override;
 
+    void saveStateToSlot(int slot);
+    void loadStateFromSlot(int slot);
+
     QStringList currentROM;
     QStringList currentGBAROM;
+    QString lastSavedStateFile;
+    QByteArray lastSavedStateBackup;
+    bool lastSavedStateHadFile = false;
+    int lastSavedStateSlot = 0;
     QList<QString> recentFileList;
     QMenu *recentMenu;
     void updateRecentFilesMenu();
@@ -297,17 +316,13 @@ public:
     ScreenPanel* panel;
 
     bool hasMenu;
+    bool glContextDirty = false;
 
     QAction* actOpenROM;
     QAction* actBootFirmware;
     QAction* actCurrentCart;
     QAction* actInsertCart;
     QAction* actEjectCart;
-    QAction* actCurrentGBACart;
-    QAction* actInsertGBACart;
-    QList<QAction*> actInsertGBAAddon;
-    QAction* actEjectGBACart;
-    QAction* actImportSavefile;
     QAction* actSaveState[9];
     QAction* actLoadState[9];
     QAction* actUndoStateLoad;

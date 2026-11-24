@@ -227,53 +227,63 @@ void WatermelonLauncher::setupUI()
     mainLayout->setSpacing(14);
 
     // --- Header Top Bar ---
-    auto* headerLayout = new QHBoxLayout();
+    auto* headerLayout = new QVBoxLayout();
     headerLayout->setSpacing(8);
 
+    auto* titleRow = new QHBoxLayout();
     titleLogo = new QLabel(this);
     titleLogo->setTextFormat(Qt::RichText);
-    headerLayout->addWidget(titleLogo);
+    titleRow->addWidget(titleLogo);
+    titleRow->addStretch(1);
+    headerLayout->addLayout(titleRow);
 
-    searchInput = new QLineEdit(this);
-    searchInput->setClearButtonEnabled(true);
-    searchInput->setMinimumWidth(80);
-    searchInput->setMaximumWidth(260);
-    searchInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    connect(searchInput, &QLineEdit::textChanged, this, &WatermelonLauncher::onSearchTextChanged);
-    headerLayout->addWidget(searchInput);
-
-    headerLayout->addStretch(1);
+    auto* buttonsRow = new QHBoxLayout();
+    buttonsRow->setSpacing(8);
 
     btnOpen = new QPushButton(this);
     btnOpen->setProperty("primary", true);
     btnOpen->setCursor(Qt::PointingHandCursor);
     btnOpen->setToolTip(tr("Abrir un archivo ROM..."));
     connect(btnOpen, &QPushButton::clicked, this, &WatermelonLauncher::onOpenClicked);
-    headerLayout->addWidget(btnOpen);
+    buttonsRow->addWidget(btnOpen);
+
+    btnBootFirmware = new QPushButton(this);
+    btnBootFirmware->setCursor(Qt::PointingHandCursor);
+    btnBootFirmware->setToolTip(tr("Arrancar el firmware de la DS (menú de la consola)"));
+    connect(btnBootFirmware, &QPushButton::clicked, this, &WatermelonLauncher::onBootFirmwareClicked);
+    buttonsRow->addWidget(btnBootFirmware);
+
+    btnMultiplayer = new QPushButton(this);
+    btnMultiplayer->setCursor(Qt::PointingHandCursor);
+    btnMultiplayer->setToolTip(tr("Partidas multijugador local o por red (LAN)"));
+    connect(btnMultiplayer, &QPushButton::clicked, this, &WatermelonLauncher::onMultiplayerClicked);
+    buttonsRow->addWidget(btnMultiplayer);
 
     btnShaders = new QPushButton(this);
     btnShaders->setCursor(Qt::PointingHandCursor);
     btnShaders->setToolTip(tr("Catálogo y configuración de shaders"));
     connect(btnShaders, &QPushButton::clicked, this, &WatermelonLauncher::onShadersClicked);
-    headerLayout->addWidget(btnShaders);
+    buttonsRow->addWidget(btnShaders);
 
     btnRA = new QPushButton(this);
     btnRA->setCursor(Qt::PointingHandCursor);
     btnRA->setToolTip(tr("RetroAchievements - Resumen y perfil"));
     connect(btnRA, &QPushButton::clicked, this, &WatermelonLauncher::onRetroAchievementsClicked);
-    headerLayout->addWidget(btnRA);
+    buttonsRow->addWidget(btnRA);
 
     btnSettings = new QPushButton(this);
     btnSettings->setCursor(Qt::PointingHandCursor);
     btnSettings->setToolTip(tr("Ajustes generales, gráficos, emulación y controles"));
     connect(btnSettings, &QPushButton::clicked, this, &WatermelonLauncher::onSettingsClicked);
-    headerLayout->addWidget(btnSettings);
+    buttonsRow->addWidget(btnSettings);
 
     btnAddDir = new QPushButton(this);
     btnAddDir->setCursor(Qt::PointingHandCursor);
     btnAddDir->setToolTip(tr("Añadir carpeta de juegos"));
     connect(btnAddDir, &QPushButton::clicked, this, &WatermelonLauncher::onAddDirectoryClicked);
-    headerLayout->addWidget(btnAddDir);
+    buttonsRow->addWidget(btnAddDir);
+
+    buttonsRow->addStretch(1);
 
     btnRefresh = new QPushButton(this);
     btnRefresh->setIcon(QIcon(QStringLiteral(":/refresh-icon")));
@@ -283,7 +293,17 @@ void WatermelonLauncher::setupUI()
     btnRefresh->setFixedSize(34, 32);
     btnRefresh->setStyleSheet(QStringLiteral("QPushButton { padding: 4px; }"));
     connect(btnRefresh, &QPushButton::clicked, this, &WatermelonLauncher::onRefreshClicked);
-    headerLayout->addWidget(btnRefresh);
+    buttonsRow->addWidget(btnRefresh);
+
+    headerLayout->addLayout(buttonsRow);
+
+    searchInput = new QLineEdit(this);
+    searchInput->setClearButtonEnabled(true);
+    searchInput->setMinimumWidth(80);
+    searchInput->setMaximumWidth(QWIDGETSIZE_MAX);
+    searchInput->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    connect(searchInput, &QLineEdit::textChanged, this, &WatermelonLauncher::onSearchTextChanged);
+    headerLayout->addWidget(searchInput);
 
     updateHeaderResponsiveness(width());
 
@@ -533,8 +553,9 @@ void WatermelonLauncher::updateHeaderResponsiveness(int w)
     if (w >= 1080) {
         titleLogo->setText(QStringLiteral("🍉 <span style='font-size:20px; font-weight:800; color:#f6f5f3;'>Watermelon<span style='color:#6fbf4a;'>DS</span></span>"));
         searchInput->setPlaceholderText(tr("🔍 Buscar en tu biblioteca..."));
-        searchInput->setMaximumWidth(280);
         btnOpen->setText(tr("📁 Abrir ROM..."));
+        btnBootFirmware->setText(tr("▶ Sistema"));
+        btnMultiplayer->setText(tr("👥 Multijugador"));
         btnShaders->setText(tr("🎨 Shaders"));
         btnRA->setText(tr("🏆 Logros"));
         btnSettings->setText(tr("⚙ Ajustes"));
@@ -543,17 +564,19 @@ void WatermelonLauncher::updateHeaderResponsiveness(int w)
     } else if (w >= 880) {
         titleLogo->setText(QStringLiteral("🍉 <span style='font-size:18px; font-weight:800; color:#f6f5f3;'>Watermelon<span style='color:#6fbf4a;'>DS</span></span>"));
         searchInput->setPlaceholderText(tr("🔍 Buscar..."));
-        searchInput->setMaximumWidth(200);
         btnOpen->setText(tr("📁 Abrir"));
-        btnShaders->setText(tr("🎨"));
+        btnBootFirmware->setText(tr("▶ Sistema"));
+        btnMultiplayer->setText(tr("👥 Multi"));
+        btnShaders->setText(tr("🎨 Shaders"));
         btnRA->setText(tr("🏆 Logros"));
         btnSettings->setText(tr("⚙ Ajustes"));
         btnAddDir->setVisible(false);
     } else {
         titleLogo->setText(tr("🍉"));
         searchInput->setPlaceholderText(tr("🔍"));
-        searchInput->setMaximumWidth(140);
         btnOpen->setText(tr("📁"));
+        btnBootFirmware->setText(tr("▶"));
+        btnMultiplayer->setText(tr("👥"));
         btnShaders->setText(tr("🎨"));
         btnRA->setText(tr("🏆"));
         btnSettings->setText(tr("⚙"));
@@ -619,6 +642,7 @@ void WatermelonLauncher::showContextMenu(const WatermelonRom& rom, const QPoint&
     auto* actPlay = menu.addAction(tr("▶  Iniciar juego"));
     menu.addSeparator();
     auto* actConfig = menu.addAction(tr("⚙️  Configuración del juego..."));
+    auto* actScreen = menu.addAction(tr("🖼️  Pantalla y vistas..."));
     auto* actCheats = menu.addAction(tr("👾  Trucos (Cheats)..."));
     auto* actRA = menu.addAction(tr("🏆  RetroAchievements..."));
     auto* actOffline = menu.addAction(tr("📴  Modo Offline..."));
@@ -638,17 +662,21 @@ void WatermelonLauncher::showContextMenu(const WatermelonRom& rom, const QPoint&
     {
         openGameDialog(rom, 0); // Tab 0: Configuración
     }
+    else if (selected == actScreen)
+    {
+        openGameDialog(rom, 1); // Tab 1: Pantalla
+    }
     else if (selected == actCheats)
     {
-        openGameDialog(rom, 1); // Tab 1: Trucos
+        openGameDialog(rom, 2); // Tab 2: Trucos
     }
     else if (selected == actRA)
     {
-        openGameDialog(rom, 2); // Tab 2: RetroAchievements
+        openGameDialog(rom, 3); // Tab 3: RetroAchievements
     }
     else if (selected == actOffline)
     {
-        openGameDialog(rom, 3); // Tab 3: Modo Offline
+        openGameDialog(rom, 4); // Tab 4: Modo Offline
     }
     else if (selected == actOpenDir)
     {
@@ -1048,6 +1076,58 @@ void WatermelonLauncher::onSearchTextChanged(const QString& text)
     renderGames();
 }
 
+void WatermelonLauncher::onBootFirmwareClicked()
+{
+    emit bootFirmwareRequested();
+}
+
+void WatermelonLauncher::onMultiplayerClicked()
+{
+    QMenu menu(this);
+    menu.setStyleSheet(QStringLiteral(
+        "QMenu {"
+        "   background-color: #1e1d24;"
+        "   color: #f6f5f3;"
+        "   border: 1px solid #2e2d38;"
+        "   border-radius: 10px;"
+        "   padding: 6px;"
+        "}"
+        "QMenu::item {"
+        "   padding: 8px 20px;"
+        "   border-radius: 6px;"
+        "   font-size: 13px;"
+        "}"
+        "QMenu::item:selected {"
+        "   background-color: #272630;"
+        "   color: #6fbf4a;"
+        "}"
+        "QMenu::separator {"
+        "   height: 1px;"
+        "   background: #2e2d38;"
+        "   margin: 4px 8px;"
+        "}"
+    ));
+
+    auto* actNewInst = menu.addAction(tr("🪟  Nueva instancia (Segunda consola)..."));
+    menu.addSeparator();
+    auto* actHostLAN = menu.addAction(tr("🌐  Crear partida LAN (Host)..."));
+    auto* actJoinLAN = menu.addAction(tr("🔗  Unirse a partida LAN (Cliente)..."));
+    menu.addSeparator();
+    auto* actMPSettings = menu.addAction(tr("⚙️  Ajustes de red y multijugador..."));
+
+    QAction* sel = menu.exec(btnMultiplayer->mapToGlobal(QPoint(0, btnMultiplayer->height() + 4)));
+    if (!sel) return;
+
+    if (sel == actNewInst)
+        emit mpNewInstanceRequested();
+    else if (sel == actHostLAN)
+        emit lanStartHostRequested();
+    else if (sel == actJoinLAN)
+        emit lanStartClientRequested();
+    else if (sel == actMPSettings)
+        emit settingsCategoryRequested(7);
+}
+
 void WatermelonLauncher::onOpenClicked()
 {
     emit openFileRequested();
@@ -1156,7 +1236,7 @@ QString WatermelonLauncher::computeRAHash(const QString& romPath)
     };
 
     // rcheevos order: header(0x160) → ARM9 → ARM7 → icon/title(0xA00)
-    md5.addData(header.constData(), 0x160);
+    md5.addData(QByteArrayView(header.constData(), 0x160));
     hashSection(arm9Offset + baseOffset, arm9Size);
     hashSection(arm7Offset + baseOffset, arm7Size);
 

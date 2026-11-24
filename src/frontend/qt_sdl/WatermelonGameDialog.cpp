@@ -9,6 +9,9 @@
 #include "ARCodeFile.h"
 #include "ARDatabaseDAT.h"
 #include "Config.h"
+#include "Screen.h"
+#include <QDateTimeEdit>
+#include <QDateTime>
 
 #include <cstdint>
 
@@ -52,6 +55,9 @@
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 namespace {
+
+WatermelonGBAConfig g_pendingGBAConfig;
+WatermelonScreenConfig g_pendingScreenConfig;
 
 QString perGameConfigPath(const QString& code)
 {
@@ -358,13 +364,14 @@ void WatermelonGameDialog::setupUI(int initialTab)
     ));
 
     tabWidget->addTab(createConfigTab(),            tr("⚙  Configuración"));
+    tabWidget->addTab(createScreenTab(),            tr("🖼  Pantalla"));
     tabWidget->addTab(createCheatsTab(),            tr("👾  Trucos"));
     tabWidget->addTab(createRetroAchievementsTab(), tr("🏆  RetroAchievements"));
     tabWidget->addTab(createOfflineTab(),           tr("📴  Offline"));
-    tabWidget->setCurrentIndex(qBound(0, initialTab, 3));
+    tabWidget->setCurrentIndex(qBound(0, initialTab, 4));
 
     connect(tabWidget, &QTabWidget::currentChanged, this, [this](int idx) {
-        if (idx == 2) {
+        if (idx == 3) {
             raLoggedIn = !WatermelonRADialog::getUsername().isEmpty()
                       && !WatermelonRADialog::getToken().isEmpty();
             if (!raLoggedIn)
@@ -448,7 +455,67 @@ QWidget* WatermelonGameDialog::createConfigTab()
         {QStringLiteral("Global"), QStringLiteral("Activado"), QStringLiteral("Desactivado")},
         0);
 
-    cLay->addWidget(buildSection({}, {nameRow, pickerConsole, pickerBoot}, content));
+    pickerDateTime = new PickerRow(tr("Fecha y hora (RTC)"),
+        {tr("Global"), tr("Hora del sistema (PC)"), tr("Fecha y hora fijada...")},
+        0);
+
+    customDateTimeRow = new QWidget();
+    customDateTimeRow->setMinimumHeight(52);
+    customDateTimeRow->setVisible(false);
+    {
+        auto* dtLay = new QHBoxLayout(customDateTimeRow);
+        dtLay->setContentsMargins(16, 0, 10, 0);
+        dtLay->setSpacing(8);
+        auto* lbl = new QLabel(tr("Fecha y hora fijada"), customDateTimeRow);
+        lbl->setStyleSheet(QStringLiteral(
+            "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
+        dtLay->addWidget(lbl, 1);
+
+        dteGameCustomTime = new QDateTimeEdit(QDateTime::currentDateTime(), customDateTimeRow);
+        dteGameCustomTime->setDisplayFormat(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+        dteGameCustomTime->setCalendarPopup(true);
+        dteGameCustomTime->setFixedHeight(28);
+        dteGameCustomTime->setStyleSheet(QStringLiteral(
+            "QDateTimeEdit { background: #252433; color: #f6f5f3; border: 1px solid #3a3848; "
+            "border-radius: 7px; padding: 0 8px; font-size: 12px; } "
+            "QDateTimeEdit::drop-down { subcontrol-origin: padding; subcontrol-position: top right; "
+            "width: 20px; border: none; background: transparent; } "
+            "QDateTimeEdit::down-arrow { image: url(:/arrow-down); width: 10px; height: 10px; }"));
+        dtLay->addWidget(dteGameCustomTime);
+
+        auto* btnNow = new QPushButton(tr("  Ahora  "), customDateTimeRow);
+        btnNow->setFixedHeight(28);
+        btnNow->setStyleSheet(QStringLiteral(
+            "QPushButton { background: #252433; color: #6fbf4a; border: 1px solid #3a3848; "
+            "border-radius: 7px; font-size: 11px; font-weight: 700; padding: 0 10px; } "
+            "QPushButton:hover { background: #2e2d40; }"));
+        connect(btnNow, &QPushButton::clicked, this, [this]() {
+            if (dteGameCustomTime) dteGameCustomTime->setDateTime(QDateTime::currentDateTime());
+        });
+        dtLay->addWidget(btnNow);
+    }
+
+    connect(pickerDateTime, &PickerRow::indexChanged, this, [this](int idx) {
+        if (customDateTimeRow) customDateTimeRow->setVisible(idx == 2);
+    });
+
+    pickerBattery = new PickerRow(tr("Nivel de batería"),
+        {tr("Global"), tr("Normal (100% / OK)"), tr("Batería baja"), tr("Casi agotada")},
+        0);
+
+    pickerDSiCharging = new PickerRow(tr("DSi: Cargador conectado"),
+        {tr("Global"), tr("Activado (Cargando)"), tr("Desactivado")},
+        0);
+
+    cLay->addWidget(buildSection({}, {
+        nameRow,
+        pickerConsole,
+        pickerBoot,
+        pickerDateTime,
+        customDateTimeRow,
+        pickerBattery,
+        pickerDSiCharging
+    }, content));
 
     // ── VÍDEO ─────────────────────────────────────────────────────────────
     cLay->addWidget(makeSectionLabel(QStringLiteral("Vídeo"), content));
@@ -512,6 +579,88 @@ QWidget* WatermelonGameDialog::createConfigTab()
         0);
 
     cLay->addWidget(buildSection({}, {pickerJit, pickerMic}, content));
+
+    // ── GBA SLOT ─────────────────────────────────────────────────────────
+    cLay->addWidget(makeSectionLabel(QStringLiteral("GBA Slot"), content));
+
+    const QString smallBtnStyle = QStringLiteral(
+        "QPushButton { background: #252433; color: #6fbf4a; border: 1px solid #3a3848; "
+        "border-radius: 7px; font-size: 11px; font-weight: 700; }"
+        "QPushButton:hover { background: #2e2d40; }");
+
+    auto* gbaCartRow = new QWidget();
+    gbaCartRow->setMinimumHeight(52);
+    {
+        auto* gLay = new QHBoxLayout(gbaCartRow);
+        gLay->setContentsMargins(16, 0, 10, 0);
+        gLay->setSpacing(8);
+        auto* lbl = new QLabel(tr("Cartucho GBA"), gbaCartRow);
+        lbl->setStyleSheet(QStringLiteral(
+            "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
+        gLay->addWidget(lbl, 1);
+
+        gbaCartLabel = new QLabel(tr("Ninguno"), gbaCartRow);
+        gbaCartLabel->setStyleSheet(QStringLiteral(
+            "font-size: 12px; color: #b3b1bd; background: transparent; max-width: 160px;"));
+        gbaCartLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        gLay->addWidget(gbaCartLabel);
+
+        auto* btnChoose = new QPushButton(tr("  Elegir  "), gbaCartRow);
+        btnChoose->setMinimumWidth(70);
+        btnChoose->setFixedHeight(28);
+        btnChoose->setStyleSheet(smallBtnStyle);
+        connect(btnChoose, &QPushButton::clicked, this, &WatermelonGameDialog::onChooseGBACartClicked);
+        gLay->addWidget(btnChoose);
+
+        auto* btnClear = new QPushButton(tr("  Quitar  "), gbaCartRow);
+        btnClear->setMinimumWidth(60);
+        btnClear->setFixedHeight(28);
+        btnClear->setStyleSheet(QStringLiteral(
+            "QPushButton { background: #252433; color: #c94444; border: 1px solid #4a2828; "
+            "border-radius: 7px; font-size: 11px; font-weight: 700; }"
+            "QPushButton:hover { background: #3a2030; color: #e5534b; }"));
+        connect(btnClear, &QPushButton::clicked, this, &WatermelonGameDialog::onClearGBACartClicked);
+        gLay->addWidget(btnClear);
+    }
+
+    pickerGBAAddon = new PickerRow(tr("Accesorio"),
+        {tr("Ninguno"),
+         QStringLiteral("RAM Expansion"),
+         QStringLiteral("Rumble Pak"),
+         QStringLiteral("Solar Sensor (Boktai 1)"),
+         QStringLiteral("Solar Sensor (Boktai 2)"),
+         QStringLiteral("Solar Sensor (Boktai 3)"),
+         QStringLiteral("Motion Pak (Homebrew)"),
+         QStringLiteral("Motion Pak (Retail)"),
+         QStringLiteral("Guitar Grip")},
+        0);
+
+    auto* importSaveRow = new QWidget();
+    importSaveRow->setMinimumHeight(52);
+    {
+        auto* iLay = new QHBoxLayout(importSaveRow);
+        iLay->setContentsMargins(16, 0, 10, 0);
+        iLay->setSpacing(8);
+        auto* lbl = new QLabel(tr("Importar partida guardada"), importSaveRow);
+        lbl->setStyleSheet(QStringLiteral(
+            "font-size: 13px; font-weight: 500; color: #f6f5f3; background: transparent;"));
+        iLay->addWidget(lbl, 1);
+
+        importSaveLabel = new QLabel(tr("Ninguno"), importSaveRow);
+        importSaveLabel->setStyleSheet(QStringLiteral(
+            "font-size: 12px; color: #b3b1bd; background: transparent; max-width: 160px;"));
+        importSaveLabel->setAlignment(Qt::AlignRight | Qt::AlignVCenter);
+        iLay->addWidget(importSaveLabel);
+
+        auto* btnImport = new QPushButton(tr("  Elegir  "), importSaveRow);
+        btnImport->setMinimumWidth(70);
+        btnImport->setFixedHeight(28);
+        btnImport->setStyleSheet(smallBtnStyle);
+        connect(btnImport, &QPushButton::clicked, this, &WatermelonGameDialog::onImportSaveClicked);
+        iLay->addWidget(btnImport);
+    }
+
+    cLay->addWidget(buildSection({}, {gbaCartRow, pickerGBAAddon, importSaveRow}, content));
 
     // ── RETROACHIEVEMENTS ─────────────────────────────────────────────────
     cLay->addWidget(makeSectionLabel(QStringLiteral("RetroAchievements"), content));
@@ -598,7 +747,127 @@ QWidget* WatermelonGameDialog::createConfigTab()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  TAB 1 – Trucos (Cheats)
+//  TAB 1 – Pantalla (Display)
+// ═══════════════════════════════════════════════════════════════════════════
+QWidget* WatermelonGameDialog::createScreenTab()
+{
+    auto* page = new QWidget();
+    page->setStyleSheet(QStringLiteral("background: #12111a;"));
+    auto* pLay = new QVBoxLayout(page);
+    pLay->setContentsMargins(0, 0, 0, 0);
+    pLay->setSpacing(0);
+
+    auto* scroll = new QScrollArea(page);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+
+    auto* content = new QWidget();
+    content->setStyleSheet(QStringLiteral("background: #12111a;"));
+    auto* cLay = new QVBoxLayout(content);
+    cLay->setContentsMargins(16, 4, 16, 24);
+    cLay->setSpacing(0);
+
+    // ── DISPOSICIÓN DE PANTALLAS ───────────────────────────────────────────
+    cLay->addWidget(makeSectionLabel(QStringLiteral("Disposición de Pantallas"), content));
+
+    pickerWindowSize = new PickerRow(tr("Tamaño de ventana"),
+        {tr("Global"), QStringLiteral("1x"), QStringLiteral("2x"), QStringLiteral("3x"), QStringLiteral("4x")},
+        0);
+
+    pickerScreenRotation = new PickerRow(tr("Rotación de pantalla"),
+        {tr("Global"), QStringLiteral("0°"), QStringLiteral("90°"), QStringLiteral("180°"), QStringLiteral("270°")},
+        0);
+
+    pickerScreenGap = new PickerRow(tr("Separación entre pantallas"),
+        {tr("Global"), QStringLiteral("0 px"), QStringLiteral("1 px"), QStringLiteral("8 px"),
+         QStringLiteral("64 px"), QStringLiteral("90 px"), QStringLiteral("128 px")},
+        0);
+
+    pickerScreenLayout = new PickerRow(tr("Disposición"),
+        {tr("Global"), tr("Natural"), tr("Vertical"), tr("Horizontal"), tr("Híbrida")},
+        0);
+
+    pickerScreenSizing = new PickerRow(tr("Tamaño de pantallas"),
+        {tr("Global"), tr("Iguales"), tr("Énfasis superior"), tr("Énfasis inferior"),
+         tr("Automático"), tr("Solo superior"), tr("Solo inferior")},
+        0);
+
+    QStringList topAspects = {tr("Global")};
+    for (int i = 0; i < AspectRatiosNum; i++)
+        topAspects << QString::fromLatin1(aspectRatios[i].label);
+
+    pickerAspectTop = new PickerRow(tr("Aspecto pantalla superior"), topAspects, 0);
+    pickerAspectBot = new PickerRow(tr("Aspecto pantalla inferior"), topAspects, 0);
+
+    cLay->addWidget(buildSection({}, {
+        pickerWindowSize,
+        pickerScreenRotation,
+        pickerScreenGap,
+        pickerScreenLayout,
+        pickerScreenSizing,
+        pickerAspectTop,
+        pickerAspectBot
+    }, content));
+
+    // ── OPCIONES DE VISUALIZACIÓN ──────────────────────────────────────────
+    cLay->addWidget(makeSectionLabel(QStringLiteral("Opciones de Visualización"), content));
+
+    pickerScreenSwap = new PickerRow(tr("Intercambiar pantallas"),
+        {tr("Global"), tr("Activado"), tr("Desactivado")},
+        0);
+
+    pickerIntegerScaling = new PickerRow(tr("Forzar escalado entero"),
+        {tr("Global"), tr("Activado"), tr("Desactivado")},
+        0);
+
+    pickerScreenFilter = new PickerRow(tr("Filtro de pantalla"),
+        {tr("Global"), tr("Activado"), tr("Desactivado")},
+        0);
+
+    cLay->addWidget(buildSection({}, {
+        pickerScreenSwap,
+        pickerIntegerScaling,
+        pickerScreenFilter
+    }, content));
+
+    cLay->addStretch();
+
+    scroll->setWidget(content);
+    pLay->addWidget(scroll, 1);
+
+    // ── Bottom save bar ────────────────────────────────────────────────────
+    auto* bar = new QWidget(page);
+    bar->setFixedHeight(60);
+    bar->setStyleSheet(QStringLiteral(
+        "background: qlineargradient(x1:0,y1:0,x2:0,y2:1,"
+        "  stop:0 #1a1928, stop:1 #15141d);"
+        "border-top: 1px solid #252433;"
+    ));
+    auto* bLay = new QHBoxLayout(bar);
+    bLay->setContentsMargins(16, 0, 16, 0);
+    bLay->addStretch();
+
+    auto* btnSave = new QPushButton(tr("💾  Guardar configuración"), bar);
+    btnSave->setFixedHeight(36);
+    btnSave->setStyleSheet(QStringLiteral(
+        "QPushButton {"
+        "  background-color: #6fbf4a;"
+        "  color: #12111a;"
+        "  font-weight: 700; font-size: 13px;"
+        "  border-radius: 8px; border: none; padding: 0 20px;"
+        "}"
+        "QPushButton:hover { background-color: #82d457; }"
+        "QPushButton:pressed { background-color: #5ca038; }"
+    ));
+    connect(btnSave, &QPushButton::clicked, this, &WatermelonGameDialog::onSaveConfigClicked);
+    bLay->addWidget(btnSave);
+    pLay->addWidget(bar);
+
+    return page;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  TAB 2 – Trucos (Cheats)
 // ═══════════════════════════════════════════════════════════════════════════
 void WatermelonGameDialog::loadCheatsForGame()
 {
@@ -2002,6 +2271,20 @@ void WatermelonGameDialog::loadPerGameConfig()
     restore(pickerJit,      QStringLiteral("JIT"));
     restore(pickerBoot,     QStringLiteral("DirectBoot"));
     restore(pickerMic,      QStringLiteral("MicSource"));
+    restore(pickerDateTime, QStringLiteral("RTCOption"));
+    restore(pickerBattery,  QStringLiteral("BatteryLevel"));
+    restore(pickerDSiCharging, QStringLiteral("BatteryCharging"));
+
+    QString dtStr = s.value(QStringLiteral("RTCFixedTime")).toString();
+    if (!dtStr.isEmpty() && dteGameCustomTime)
+    {
+        QDateTime dt = QDateTime::fromString(dtStr, Qt::ISODate);
+        if (dt.isValid()) dteGameCustomTime->setDateTime(dt);
+    }
+    if (customDateTimeRow && pickerDateTime)
+    {
+        customDateTimeRow->setVisible(pickerDateTime->currentIndex() == 2);
+    }
 
     bool cheats = s.value(QStringLiteral("EnableCheats"), false).toBool();
     if (switchCheatsEnabled) switchCheatsEnabled->setChecked(cheats);
@@ -2011,6 +2294,33 @@ void WatermelonGameDialog::loadPerGameConfig()
         shaderLabel->setText((!currentShaderPath.isEmpty() && QFile::exists(currentShaderPath))
             ? QFileInfo(currentShaderPath).fileName()
             : QStringLiteral("Global"));
+    }
+
+    restore(pickerGBAAddon, QStringLiteral("GBAAddon"));
+
+    restore(pickerWindowSize,       QStringLiteral("ScreenWindowSize"));
+    restore(pickerScreenRotation,   QStringLiteral("ScreenRotation"));
+    restore(pickerScreenGap,        QStringLiteral("ScreenGap"));
+    restore(pickerScreenLayout,     QStringLiteral("ScreenLayout"));
+    restore(pickerScreenSizing,     QStringLiteral("ScreenSizing"));
+    restore(pickerAspectTop,        QStringLiteral("ScreenAspectTop"));
+    restore(pickerAspectBot,        QStringLiteral("ScreenAspectBot"));
+    restore(pickerScreenSwap,       QStringLiteral("ScreenSwap"));
+    restore(pickerIntegerScaling,   QStringLiteral("ScreenIntegerScaling"));
+    restore(pickerScreenFilter,     QStringLiteral("ScreenFilter"));
+
+    currentGBACartPath = s.value(QStringLiteral("GBACartPath"), QString()).toString();
+    if (gbaCartLabel) {
+        gbaCartLabel->setText((!currentGBACartPath.isEmpty() && QFile::exists(currentGBACartPath))
+            ? QFileInfo(currentGBACartPath).fileName()
+            : tr("Ninguno"));
+    }
+
+    pendingImportSavePath = s.value(QStringLiteral("ImportSavePath"), QString()).toString();
+    if (importSaveLabel) {
+        importSaveLabel->setText((!pendingImportSavePath.isEmpty() && QFile::exists(pendingImportSavePath))
+            ? QFileInfo(pendingImportSavePath).fileName()
+            : tr("Ninguno"));
     }
 }
 
@@ -2024,8 +2334,28 @@ void WatermelonGameDialog::savePerGameConfig()
     s.setValue(QStringLiteral("JIT"),         pickerJit      ? pickerJit->currentIndex()      : 0);
     s.setValue(QStringLiteral("DirectBoot"),  pickerBoot     ? pickerBoot->currentIndex()     : 0);
     s.setValue(QStringLiteral("MicSource"),   pickerMic      ? pickerMic->currentIndex()      : 0);
+    s.setValue(QStringLiteral("RTCOption"),        pickerDateTime ? pickerDateTime->currentIndex() : 0);
+    s.setValue(QStringLiteral("BatteryLevel"),     pickerBattery ? pickerBattery->currentIndex() : 0);
+    s.setValue(QStringLiteral("BatteryCharging"),  pickerDSiCharging ? pickerDSiCharging->currentIndex() : 0);
+    if (dteGameCustomTime)
+        s.setValue(QStringLiteral("RTCFixedTime"), dteGameCustomTime->dateTime().toString(Qt::ISODate));
     s.setValue(QStringLiteral("EnableCheats"), switchCheatsEnabled ? switchCheatsEnabled->isChecked() : false);
     s.setValue(QStringLiteral("ShaderPath"),  currentShaderPath);
+    s.setValue(QStringLiteral("GBACartPath"), currentGBACartPath);
+    s.setValue(QStringLiteral("GBAAddon"),    pickerGBAAddon ? pickerGBAAddon->currentIndex() : 0);
+    s.setValue(QStringLiteral("ImportSavePath"), pendingImportSavePath);
+
+    s.setValue(QStringLiteral("ScreenWindowSize"),     pickerWindowSize     ? pickerWindowSize->currentIndex()     : 0);
+    s.setValue(QStringLiteral("ScreenRotation"),       pickerScreenRotation ? pickerScreenRotation->currentIndex() : 0);
+    s.setValue(QStringLiteral("ScreenGap"),            pickerScreenGap      ? pickerScreenGap->currentIndex()      : 0);
+    s.setValue(QStringLiteral("ScreenLayout"),         pickerScreenLayout   ? pickerScreenLayout->currentIndex()   : 0);
+    s.setValue(QStringLiteral("ScreenSizing"),         pickerScreenSizing   ? pickerScreenSizing->currentIndex()   : 0);
+    s.setValue(QStringLiteral("ScreenAspectTop"),      pickerAspectTop      ? pickerAspectTop->currentIndex()      : 0);
+    s.setValue(QStringLiteral("ScreenAspectBot"),      pickerAspectBot      ? pickerAspectBot->currentIndex()      : 0);
+    s.setValue(QStringLiteral("ScreenSwap"),           pickerScreenSwap     ? pickerScreenSwap->currentIndex()     : 0);
+    s.setValue(QStringLiteral("ScreenIntegerScaling"), pickerIntegerScaling ? pickerIntegerScaling->currentIndex() : 0);
+    s.setValue(QStringLiteral("ScreenFilter"),         pickerScreenFilter   ? pickerScreenFilter->currentIndex()   : 0);
+
     s.sync();
 }
 
@@ -2054,14 +2384,113 @@ void WatermelonGameDialog::onClearShaderClicked()
     if (shaderLabel) shaderLabel->setText(tr("Global"));
 }
 
+void WatermelonGameDialog::onChooseGBACartClicked()
+{
+    QString path = QFileDialog::getOpenFileName(this, tr("Seleccionar ROM de GBA"),
+        QFileInfo(romInfo.filePath).absolutePath(),
+        tr("ROM de GBA (*.gba *.agb *.bin);;Cualquier archivo (*.*)"));
+    if (path.isEmpty()) return;
+
+    currentGBACartPath = path;
+    if (gbaCartLabel) gbaCartLabel->setText(QFileInfo(path).fileName());
+}
+
+void WatermelonGameDialog::onClearGBACartClicked()
+{
+    currentGBACartPath.clear();
+    if (gbaCartLabel) gbaCartLabel->setText(tr("Ninguno"));
+}
+
+void WatermelonGameDialog::onImportSaveClicked()
+{
+    QString path = QFileDialog::getOpenFileName(this, tr("Seleccionar partida guardada"),
+        QFileInfo(romInfo.filePath).absolutePath(),
+        tr("Partidas guardadas (*.sav *.bin *.dsv);;Cualquier archivo (*.*)"));
+    if (path.isEmpty()) return;
+
+    pendingImportSavePath = path;
+    if (importSaveLabel) importSaveLabel->setText(QFileInfo(path).fileName());
+}
+
+WatermelonGBAConfig WatermelonGameDialog::takePendingGBAConfig()
+{
+    WatermelonGBAConfig cfg = g_pendingGBAConfig;
+    g_pendingGBAConfig = WatermelonGBAConfig{};
+    return cfg;
+}
+
+WatermelonScreenConfig WatermelonGameDialog::takePendingScreenConfig()
+{
+    WatermelonScreenConfig cfg = g_pendingScreenConfig;
+    g_pendingScreenConfig = WatermelonScreenConfig{};
+    return cfg;
+}
+
 void WatermelonGameDialog::applyGameConfig(const QString& gameCode)
 {
+    g_pendingGBAConfig = WatermelonGBAConfig{};
+    g_pendingScreenConfig = WatermelonScreenConfig{};
     if (gameCode.isEmpty()) return;
     QString path = perGameConfigPath(gameCode);
     if (!QFile::exists(path)) return;
 
     QSettings s(path, QSettings::IniFormat);
     Config::Table cfg = Config::GetGlobalTable();
+
+    g_pendingGBAConfig.cartPath = s.value(QStringLiteral("GBACartPath"), QString()).toString();
+
+    int addonIndex = s.value(QStringLiteral("GBAAddon"), 0).toInt();
+    if (addonIndex > 0 && addonIndex <= 8)
+        g_pendingGBAConfig.addon = addonIndex;
+
+    QString importPath = s.value(QStringLiteral("ImportSavePath"), QString()).toString();
+    if (!importPath.isEmpty()) {
+        g_pendingGBAConfig.importSavePath = importPath;
+        // One-shot: a savefile is imported only on the next boot.
+        s.remove(QStringLiteral("ImportSavePath"));
+        s.sync();
+    }
+
+    int winSize = s.value(QStringLiteral("ScreenWindowSize"), 0).toInt();
+    if (winSize > 0)
+        g_pendingScreenConfig.sizeFactor = winSize;
+
+    int rot = s.value(QStringLiteral("ScreenRotation"), 0).toInt();
+    if (rot > 0 && rot <= 4)
+        g_pendingScreenConfig.rotation = rot - 1;
+
+    int gapIdx = s.value(QStringLiteral("ScreenGap"), 0).toInt();
+    static const int gapValues[] = {0, 1, 8, 64, 90, 128};
+    if (gapIdx > 0 && gapIdx <= 6)
+        g_pendingScreenConfig.gap = gapValues[gapIdx - 1];
+
+    int lay = s.value(QStringLiteral("ScreenLayout"), 0).toInt();
+    if (lay > 0)
+        g_pendingScreenConfig.layout = lay - 1;
+
+    int siz = s.value(QStringLiteral("ScreenSizing"), 0).toInt();
+    if (siz > 0)
+        g_pendingScreenConfig.sizing = siz - 1;
+
+    int aspTop = s.value(QStringLiteral("ScreenAspectTop"), 0).toInt();
+    if (aspTop > 0 && aspTop <= AspectRatiosNum)
+        g_pendingScreenConfig.aspectTop = aspectRatios[aspTop - 1].id;
+
+    int aspBot = s.value(QStringLiteral("ScreenAspectBot"), 0).toInt();
+    if (aspBot > 0 && aspBot <= AspectRatiosNum)
+        g_pendingScreenConfig.aspectBot = aspectRatios[aspBot - 1].id;
+
+    int swap = s.value(QStringLiteral("ScreenSwap"), 0).toInt();
+    if (swap > 0)
+        g_pendingScreenConfig.swap = (swap == 1 ? 1 : 0);
+
+    int intSc = s.value(QStringLiteral("ScreenIntegerScaling"), 0).toInt();
+    if (intSc > 0)
+        g_pendingScreenConfig.integerScaling = (intSc == 1 ? 1 : 0);
+
+    int flt = s.value(QStringLiteral("ScreenFilter"), 0).toInt();
+    if (flt > 0)
+        g_pendingScreenConfig.filter = (flt == 1 ? 1 : 0);
 
     int console  = s.value(QStringLiteral("ConsoleType"), 0).toInt();
     int renderer = s.value(QStringLiteral("Renderer3D"),  0).toInt();
@@ -2072,6 +2501,40 @@ void WatermelonGameDialog::applyGameConfig(const QString& gameCode)
     if (renderer > 0) cfg.SetInt("3D.Renderer",     renderer - 1);
     if (jit      > 0) cfg.SetBool("JIT.Enable",     jit == 1);
     if (boot     > 0) cfg.SetBool("Emu.DirectBoot", boot == 1);
+
+    Config::Table localCfg0 = Config::GetLocalTable(0);
+    int rtcOpt = s.value(QStringLiteral("RTCOption"), 0).toInt();
+    if (rtcOpt == 1) {
+        localCfg0.SetInt64("RTC.Offset", 0);
+    } else if (rtcOpt == 2) {
+        QString dtFixedStr = s.value(QStringLiteral("RTCFixedTime")).toString();
+        if (!dtFixedStr.isEmpty()) {
+            QDateTime target = QDateTime::fromString(dtFixedStr, Qt::ISODate);
+            if (target.isValid()) {
+                qint64 offset = QDateTime::currentDateTime().secsTo(target);
+                localCfg0.SetInt64("RTC.Offset", offset);
+            }
+        }
+    }
+
+    int batLvl = s.value(QStringLiteral("BatteryLevel"), 0).toInt();
+    if (batLvl == 1) {
+        localCfg0.SetBool("DS.Battery.LevelOkay", true);
+        localCfg0.SetInt("DSi.Battery.Level", 0xF);
+    } else if (batLvl == 2) {
+        localCfg0.SetBool("DS.Battery.LevelOkay", false);
+        localCfg0.SetInt("DSi.Battery.Level", 0x3);
+    } else if (batLvl == 3) {
+        localCfg0.SetBool("DS.Battery.LevelOkay", false);
+        localCfg0.SetInt("DSi.Battery.Level", 0x1);
+    }
+
+    int batCharge = s.value(QStringLiteral("BatteryCharging"), 0).toInt();
+    if (batCharge == 1) {
+        localCfg0.SetBool("DSi.Battery.Charging", true);
+    } else if (batCharge == 2) {
+        localCfg0.SetBool("DSi.Battery.Charging", false);
+    }
 
     bool cheats = s.value(QStringLiteral("EnableCheats"), false).toBool();
     cfg.SetBool("EnableCheats", cheats);

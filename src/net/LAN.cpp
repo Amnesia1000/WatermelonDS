@@ -294,9 +294,9 @@ bool LAN::StartDiscovery()
     saddr.sin_addr.s_addr = htonl(INADDR_ANY);
     saddr.sin_port = htons(kDiscoveryPort);
     int reuse = 1;
-    setsockopt(DiscoverySocket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+    setsockopt(DiscoverySocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 #ifdef SO_REUSEPORT
-    setsockopt(DiscoverySocket, SOL_SOCKET, SO_REUSEPORT, &reuse, sizeof(reuse));
+    setsockopt(DiscoverySocket, SOL_SOCKET, SO_REUSEPORT, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
 #endif
     res = bind(DiscoverySocket, (const sockaddr_t*)&saddr, sizeof(saddr));
     if (res < 0)

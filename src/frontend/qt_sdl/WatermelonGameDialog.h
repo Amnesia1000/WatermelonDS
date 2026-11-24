@@ -22,6 +22,7 @@ class PickerRow;
 class QTreeWidget;
 class QTreeWidgetItem;
 class WatermelonSwitch;
+class QDateTimeEdit;
 
 namespace melonDS {
     class ARCodeFile;
@@ -53,6 +54,29 @@ struct RAGameInfo
     QList<RAGameAchievement> achievements;
 };
 
+// ─── Per-game GBA slot setup, applied on next boot ────────────────────────
+struct WatermelonGBAConfig
+{
+    QString cartPath;
+    int     addon = -1;
+    QString importSavePath;
+};
+
+// ─── Per-game screen layout overrides, applied on next boot ───────────────
+struct WatermelonScreenConfig
+{
+    int rotation       = -1;
+    int gap            = -1;
+    int layout         = -1;
+    int sizing         = -1;
+    int aspectTop      = -1;
+    int aspectBot      = -1;
+    int swap           = -1; // -1 inherit, 0 off, 1 on
+    int integerScaling = -1;
+    int filter         = -1;
+    int sizeFactor     = 0;  // 0 = inherit
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 class WatermelonGameDialog : public QDialog
 {
@@ -63,11 +87,16 @@ public:
     ~WatermelonGameDialog() override;
 
     static void applyGameConfig(const QString& gameCode);
+    static WatermelonGBAConfig takePendingGBAConfig();
+    static WatermelonScreenConfig takePendingScreenConfig();
 
 private slots:
     void onSaveConfigClicked();
     void onChooseShaderClicked();
     void onClearShaderClicked();
+    void onChooseGBACartClicked();
+    void onClearGBACartClicked();
+    void onImportSaveClicked();
     void onRALoginClicked();
     void onRALogoutClicked();
     void onViewOnWebClicked();
@@ -78,6 +107,7 @@ private slots:
 private:
     void   setupUI(int initialTab);
     QWidget* createConfigTab();
+    QWidget* createScreenTab();
     QWidget* createCheatsTab();
     QWidget* createRetroAchievementsTab();
     QWidget* createOfflineTab();
@@ -112,8 +142,28 @@ private:
     PickerRow* pickerJit       = nullptr;
     PickerRow* pickerBoot      = nullptr;
     PickerRow* pickerMic       = nullptr;
+    PickerRow* pickerDateTime       = nullptr;
+    QWidget*   customDateTimeRow    = nullptr;
+    QDateTimeEdit* dteGameCustomTime = nullptr;
+    PickerRow* pickerBattery        = nullptr;
+    PickerRow* pickerDSiCharging    = nullptr;
+    PickerRow* pickerGBAAddon  = nullptr;
+    PickerRow* pickerScreenLayout   = nullptr;
+    PickerRow* pickerScreenSizing   = nullptr;
+    PickerRow* pickerScreenRotation = nullptr;
+    PickerRow* pickerScreenGap      = nullptr;
+    PickerRow* pickerAspectTop      = nullptr;
+    PickerRow* pickerAspectBot      = nullptr;
+    PickerRow* pickerScreenSwap     = nullptr;
+    PickerRow* pickerIntegerScaling = nullptr;
+    PickerRow* pickerScreenFilter   = nullptr;
+    PickerRow* pickerWindowSize     = nullptr;
     QLabel*    shaderLabel     = nullptr;
+    QLabel*    gbaCartLabel    = nullptr;
+    QLabel*    importSaveLabel = nullptr;
     QString    currentShaderPath;
+    QString    currentGBACartPath;
+    QString    pendingImportSavePath;
 
     // Cheats tab
     WatermelonSwitch* switchCheatsEnabled = nullptr;

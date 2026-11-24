@@ -11,8 +11,14 @@
 #include <QSlider>
 #include <QLabel>
 #include <QPushButton>
+#include <QDateTimeEdit>
+#include <QDateTime>
+#include <vector>
+#include "Net_PCap.h"
 
 class InputConfigDialog;
+class QRadioButton;
+class QDoubleSpinBox;
 
 class WatermelonSwitch : public QAbstractButton
 {
@@ -52,6 +58,8 @@ private slots:
     void onResetDefaultsClicked();
     void onApplyClicked();
     void onOkClicked();
+    void updateNetAdapterControls();
+    void onNetAdapterIndexChanged(int index);
 
 private:
     void setupUI();
@@ -63,8 +71,10 @@ private:
     QWidget* createSystemPage();
     QWidget* createCpuPage();
     QWidget* createGraphicsPage();
+    QWidget* createDisplayPage();
     QWidget* createAudioPage();
     QWidget* createControlsPage();
+    QWidget* createMultiplayerPage();
     QWidget* createRAPage();
 
     // Sidebar & Navigation
@@ -77,6 +87,14 @@ private:
     WatermelonSwitch* swDirectBoot = nullptr;
     QListWidget* listRomDirs = nullptr;
     QComboBox* cbxUILanguage = nullptr;
+    QLineEdit* txtSaveFilePath = nullptr;
+    QLineEdit* txtSavestatePath = nullptr;
+    QLineEdit* txtCheatFilePath = nullptr;
+    QSpinBox* spnMouseHideSeconds = nullptr;
+    QDoubleSpinBox* spnTargetFPS = nullptr;
+    QDoubleSpinBox* spnFastForwardFPS = nullptr;
+    QDoubleSpinBox* spnSlowmoFPS = nullptr;
+    WatermelonSwitch* swSavestateRelocSRAM = nullptr;
 
     // System Page widgets
     QComboBox* cbxConsoleType = nullptr;
@@ -96,6 +114,51 @@ private:
     QLineEdit* txtDSiFirmware = nullptr;
     QLineEdit* txtDSiNAND = nullptr;
 
+    // System Page - DSi & DLDI widgets
+    WatermelonSwitch* swDSiFullBIOSBoot = nullptr;
+    WatermelonSwitch* swDSPHLE = nullptr;
+    WatermelonSwitch* swDSiSDEnable = nullptr;
+    QWidget* dsiSDContainer = nullptr;
+    QLineEdit* txtDSiSDPath = nullptr;
+    QComboBox* cbxDSiSDSize = nullptr;
+    WatermelonSwitch* swDSiSDReadOnly = nullptr;
+    WatermelonSwitch* swDSiSDFolder = nullptr;
+    QWidget* dsiSDFolderContainer = nullptr;
+    QLineEdit* txtDSiSDFolder = nullptr;
+
+    WatermelonSwitch* swDLDIEnable = nullptr;
+    QWidget* dldiContainer = nullptr;
+    QLineEdit* txtDLDISDPath = nullptr;
+    QComboBox* cbxDLDISize = nullptr;
+    WatermelonSwitch* swDLDIReadOnly = nullptr;
+    WatermelonSwitch* swDLDIFolder = nullptr;
+    QWidget* dldiFolderContainer = nullptr;
+    QLineEdit* txtDLDIFolder = nullptr;
+
+    // DSi Cameras
+    QComboBox* cbxCam0Type = nullptr;
+    QLineEdit* txtCam0ImagePath = nullptr;
+    QComboBox* cbxCam0Device = nullptr;
+    WatermelonSwitch* swCam0XFlip = nullptr;
+    QWidget* cam0ImageContainer = nullptr;
+    QWidget* cam0DeviceContainer = nullptr;
+
+    QComboBox* cbxCam1Type = nullptr;
+    QLineEdit* txtCam1ImagePath = nullptr;
+    QComboBox* cbxCam1Device = nullptr;
+    WatermelonSwitch* swCam1XFlip = nullptr;
+    QWidget* cam1ImageContainer = nullptr;
+    QWidget* cam1DeviceContainer = nullptr;
+
+    // System Page - RTC & Power widgets
+    WatermelonSwitch* swCustomRTC = nullptr;
+    QWidget* rtcContainer = nullptr;
+    QDateTimeEdit* dteCustomRTC = nullptr;
+    QPushButton* btnRTCNow = nullptr;
+    QComboBox* cbxDSBattery = nullptr;
+    QComboBox* cbxDSiBattery = nullptr;
+    WatermelonSwitch* swDSiCharging = nullptr;
+
     // CPU Page widgets
     WatermelonSwitch* swJitEnable = nullptr;
     QSpinBox* spnJitBlockSize = nullptr;
@@ -112,14 +175,44 @@ private:
     WatermelonSwitch* swHiresCoords = nullptr;
     WatermelonSwitch* swSoftThreaded = nullptr;
 
+    // Display Page widgets
+    QComboBox* cbxWindowSize = nullptr;
+    QComboBox* cbxScreenLayout = nullptr;
+    QComboBox* cbxScreenSizing = nullptr;
+    QComboBox* cbxScreenRotation = nullptr;
+    QSpinBox* spnScreenGap = nullptr;
+    QComboBox* cbxScreenAspectTop = nullptr;
+    QComboBox* cbxScreenAspectBot = nullptr;
+    WatermelonSwitch* swScreenSwap = nullptr;
+    WatermelonSwitch* swIntegerScaling = nullptr;
+    WatermelonSwitch* swScreenFilter = nullptr;
+
     // Audio Page widgets
     QSlider* sldVolume = nullptr;
     QLabel* lblVolumeVal = nullptr;
     QComboBox* cbxInterpolation = nullptr;
     QComboBox* cbxBitDepth = nullptr;
+    WatermelonSwitch* swDSiVolumeSync = nullptr;
+    QComboBox* cbxMicInputType = nullptr;
+    QComboBox* cbxMicDevice = nullptr;
+    QLineEdit* txtMicWavPath = nullptr;
+    QWidget* micDeviceContainer = nullptr;
+    QWidget* micWavContainer = nullptr;
 
     // Controls Page widgets
     InputConfigDialog* inputConfigWidget = nullptr;
+
+    // Multiplayer & Network Page widgets
+    QComboBox* cbxMPAudioMode = nullptr;
+    QSpinBox* spnMPRecvTimeout = nullptr;
+    QRadioButton* rbDirectMode = nullptr;
+    QRadioButton* rbIndirectMode = nullptr;
+    QComboBox* cbxNetAdapter = nullptr;
+    QLabel* lblAdapterMAC = nullptr;
+    QLabel* lblAdapterIP = nullptr;
+    QWidget* adapterContainer = nullptr;
+    std::vector<melonDS::AdapterData> netAdapters;
+    bool hasNetPcap = false;
 
     // RetroAchievements Page widgets
     WatermelonSwitch* swRAEnabled = nullptr;

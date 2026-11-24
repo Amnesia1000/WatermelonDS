@@ -1216,7 +1216,7 @@ void WatermelonLauncher::onMultiplayerClicked()
     else if (sel == actJoinLAN)
         emit lanStartClientRequested();
     else if (sel == actMPSettings)
-        emit settingsCategoryRequested(7);
+        emit settingsCategoryRequested(8);
 }
 
 void WatermelonLauncher::onOpenClicked()

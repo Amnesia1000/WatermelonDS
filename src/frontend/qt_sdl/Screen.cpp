@@ -816,19 +816,6 @@ void ScreenPanelNative::paintEvent(QPaintEvent* event)
 
     osdUpdate();
 
-    if (!emuThread->emuIsActive())
-    {
-        // splashscreen
-        osdMutex.lock();
-
-        painter.drawPixmap(QRect(splashPos[3], QSize(kLogoWidth, kLogoWidth)), splashLogo);
-
-        for (int i = 0; i < 3; i++)
-            painter.drawImage(splashPos[i], splashText[i].bitmap);
-
-        osdMutex.unlock();
-    }
-
     if (osdEnabled)
     {
         osdMutex.lock();
@@ -1168,51 +1155,6 @@ void ScreenPanelGL::drawScreenGL()
     }
 
     osdUpdate();
-
-    if (!emuThread->emuIsActive())
-    {
-        // splashscreen
-        osdMutex.lock();
-
-        glUseProgram(osdShader);
-
-        glUniform2f(osdScreenSizeULoc, w, h);
-        glUniform1f(osdScaleFactorULoc, factor);
-        glUniform1f(osdTexScaleULoc, 2.0);
-
-        glBindBuffer(GL_ARRAY_BUFFER, osdVertexBuffer);
-        glBindVertexArray(osdVertexArray);
-
-        glActiveTexture(GL_TEXTURE0);
-
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-        glBindTexture(GL_TEXTURE_2D, logoTexture);
-        glUniform2i(osdPosULoc, splashPos[3].x(), splashPos[3].y());
-        glUniform2i(osdSizeULoc, kLogoWidth, kLogoWidth);
-        glDrawArrays(GL_TRIANGLES, 0, 2*3);
-
-        glUniform1f(osdTexScaleULoc, 1.0);
-
-        for (int i = 0; i < 3; i++)
-        {
-            OSDItem& item = splashText[i];
-
-            if (!osdTextures.count(item.id))
-                continue;
-
-            glBindTexture(GL_TEXTURE_2D, osdTextures[item.id]);
-            glUniform2i(osdPosULoc, splashPos[i].x(), splashPos[i].y());
-            glUniform2i(osdSizeULoc, item.bitmap.width(), item.bitmap.height());
-            glDrawArrays(GL_TRIANGLES, 0, 2*3);
-        }
-
-        glDisable(GL_BLEND);
-        glUseProgram(0);
-
-        osdMutex.unlock();
-    }
 
     if (osdEnabled)
     {

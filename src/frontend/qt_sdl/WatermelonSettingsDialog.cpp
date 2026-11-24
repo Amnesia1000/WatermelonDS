@@ -1223,7 +1223,6 @@ QWidget* WatermelonSettingsDialog::createGraphicsPage()
     cbxRenderer3D->addItem(tr("Software (Renderizado por CPU)"), 0);
     cbxRenderer3D->addItem(QStringLiteral("OpenGL"), 1);
     cbxRenderer3D->addItem(QStringLiteral("OpenGL Compute"), 2);
-    cbxRenderer3D->addItem(tr("Vulkan (Experimental)"), 3);
     setupInput(cbxRenderer3D);
     grid->addWidget(cbxRenderer3D, 0, 1);
 

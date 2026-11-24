@@ -220,7 +220,7 @@ void WatermelonRAEngine::performHttpRequest(const QString& url, const QByteArray
                                               void* callbackData)
 {
     QNetworkRequest req((QUrl(url)));
-    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("WatermelonDS/1.0"));
+    req.setHeader(QNetworkRequest::UserAgentHeader, QStringLiteral("melonDS/1.1"));
     if (!postData.isEmpty())
         req.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
 

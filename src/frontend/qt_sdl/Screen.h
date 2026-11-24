@@ -68,7 +68,7 @@ public:
     QSize screenGetMinSize(int factor);
 
     void osdSetEnabled(bool enabled);
-    void osdAddMessage(unsigned int color, const char* msg);
+    void osdAddMessage(unsigned int color, const char* msg, bool forceShow = false);
 
 signals:
     void mouseMoved(const QPoint& pos);
@@ -112,6 +112,7 @@ protected:
         unsigned int color;
 
         bool rendered;
+        bool forceShow = false;
         QImage bitmap;
 
         int rainbowstart;

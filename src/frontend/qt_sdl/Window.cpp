@@ -711,7 +711,7 @@ MainWindow::MainWindow(int id, EmuInstance* inst, QWidget* parent) :
         if (emuThread)
             emuThread->setRAEngine(raEngine);
         connect(raEngine, &WatermelonRAEngine::osdNotification, this, [this](const QString& msg, unsigned int color) {
-            if (panel) panel->osdAddMessage(color, msg.toUtf8().constData());
+            if (panel) panel->osdAddMessage(color, msg.toUtf8().constData(), true);
         });
     }
     if (windowID != 0 || (emuThread && emuThread->emuIsActive()))

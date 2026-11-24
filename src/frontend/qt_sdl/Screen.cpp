@@ -632,9 +632,9 @@ void ScreenPanel::osdSetEnabled(bool enabled)
     osdMutex.unlock();
 }
 
-void ScreenPanel::osdAddMessage(unsigned int color, const char* text)
+void ScreenPanel::osdAddMessage(unsigned int color, const char* text, bool forceShow)
 {
-    if (!osdEnabled) return;
+    if (!osdEnabled && !forceShow) return;
 
     osdMutex.lock();
 
@@ -645,6 +645,7 @@ void ScreenPanel::osdAddMessage(unsigned int color, const char* text)
     strncpy(item.text, text, 255); item.text[255] = '\0';
     item.color = color;
     item.rendered = false;
+    item.forceShow = forceShow;
     item.rainbowstart = -1;
 
     osdItems.push_back(item);
@@ -816,7 +817,7 @@ void ScreenPanelNative::paintEvent(QPaintEvent* event)
 
     osdUpdate();
 
-    if (osdEnabled)
+    if (osdEnabled || !osdItems.empty())
     {
         osdMutex.lock();
 
@@ -827,6 +828,11 @@ void ScreenPanelNative::paintEvent(QPaintEvent* event)
         for (auto it = osdItems.begin(); it != osdItems.end(); )
         {
             OSDItem& item = *it;
+            if (!osdEnabled && !item.forceShow)
+            {
+                it++;
+                continue;
+            }
 
             painter.drawImage(kOSDMargin, y, item.bitmap);
 
@@ -1172,7 +1178,7 @@ void ScreenPanelGL::drawScreenGL()
 
     osdUpdate();
 
-    if (osdEnabled)
+    if (osdEnabled || !osdItems.empty())
     {
         osdMutex.lock();
 
@@ -1195,6 +1201,11 @@ void ScreenPanelGL::drawScreenGL()
         for (auto it = osdItems.begin(); it != osdItems.end(); )
         {
             OSDItem& item = *it;
+            if (!osdEnabled && !item.forceShow)
+            {
+                it++;
+                continue;
+            }
 
             if (!osdTextures.count(item.id))
                 continue;

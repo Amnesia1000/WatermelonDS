@@ -14,6 +14,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QPushButton>
+#include <QSlider>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QDir>
@@ -59,7 +60,8 @@ public:
         }
         else if (!m_rom.icon.isNull())
         {
-            m_scaledIcon = m_rom.icon.scaled(44, 44, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+            int iconSz = qBound(24, cardW / 4, 44);
+            m_scaledIcon = m_rom.icon.scaled(iconSz, iconSz, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         }
     }
 
@@ -101,7 +103,7 @@ protected:
         p.setRenderHint(QPainter::Antialiasing);
         p.setRenderHint(QPainter::SmoothPixmapTransform);
 
-        const int r = 14;
+        const int r = qBound(8, m_cardW / 12, 14);
         QRect cardRect = rect();
 
         QPainterPath clipPath;
@@ -125,17 +127,19 @@ protected:
             // Subtle cartridge or controller icon in center
             if (!m_scaledIcon.isNull())
             {
-                p.drawPixmap((width() - 44) / 2, (height() / 2) - 36, m_scaledIcon);
+                p.drawPixmap((width() - m_scaledIcon.width()) / 2, (height() - m_scaledIcon.height()) / 2 - 12, m_scaledIcon);
             }
             else
             {
                 p.setPen(QColor(QStringLiteral("#434253")));
-                p.setFont(QFont(QStringLiteral("sans-serif"), 24, QFont::Bold));
+                int emojiSize = qBound(16, m_cardW / 7, 24);
+                p.setFont(QFont(QStringLiteral("sans-serif"), emojiSize, QFont::Bold));
                 p.drawText(QRect(0, 0, width(), height() - 30), Qt::AlignCenter, QStringLiteral("🎮"));
             }
 
             // Bottom title overlay for missing cover
-            QRect titleBox(0, height() - 56, width(), 56);
+            int titleBoxH = qBound(36, height() / 3, 56);
+            QRect titleBox(0, height() - titleBoxH, width(), titleBoxH);
             QLinearGradient grad(0, titleBox.top(), 0, titleBox.bottom());
             grad.setColorAt(0.0, QColor(14, 13, 18, 0));
             grad.setColorAt(0.35, QColor(14, 13, 18, 205));
@@ -143,26 +147,28 @@ protected:
             p.fillRect(titleBox, grad);
 
             p.setPen(QColor(QStringLiteral("#f6f5f3")));
-            QFont f(QStringLiteral("sans-serif"), 9, QFont::DemiBold);
+            int fontPt = qBound(7, m_cardW / 18, 9);
+            QFont f(QStringLiteral("sans-serif"), fontPt, QFont::DemiBold);
             p.setFont(f);
             QString titleText = m_rom.title.isEmpty() ? m_rom.fileName : m_rom.title;
-            QRect textRect = titleBox.adjusted(8, 12, -8, -4);
+            QRect textRect = titleBox.adjusted(6, 6, -6, -4);
             p.drawText(textRect, Qt::AlignTop | Qt::AlignLeft | Qt::TextWordWrap, titleText);
         }
 
         // Draw top badges overlaid on the cover
         // 1. DS / DSi badge (always visible)
         QString badgeText = m_rom.isDSi ? QStringLiteral("DSi") : QStringLiteral("DS");
-        QFont badgeFont(QStringLiteral("sans-serif"), 8, QFont::Bold);
+        int badgePt = qBound(7, m_cardW / 21, 8);
+        QFont badgeFont(QStringLiteral("sans-serif"), badgePt, QFont::Bold);
         QFontMetrics fm(badgeFont);
-        int badgeW = fm.horizontalAdvance(badgeText) + 12;
-        int badgeH = 18;
-        QRect dsRect(7, 7, badgeW, badgeH);
+        int badgeW = fm.horizontalAdvance(badgeText) + 10;
+        int badgeH = qBound(15, m_cardH / 10, 18);
+        QRect dsRect(6, 6, badgeW, badgeH);
 
         // Semi-transparent black background with border
         p.setPen(QPen(QColor(255, 255, 255, 80), 1));
         p.setBrush(QColor(0, 0, 0, 160));
-        p.drawRoundedRect(dsRect, 5, 5);
+        p.drawRoundedRect(dsRect, 4, 4);
         p.setPen(QColor(255, 255, 255));
         p.setFont(badgeFont);
         p.drawText(dsRect, Qt::AlignCenter, badgeText);
@@ -170,22 +176,25 @@ protected:
         // 2. Achievements badge (only if game has achievements)
         if (m_rom.hasAchievements)
         {
-            QRect raRect(dsRect.right() + 5, 7, 22, 18);
+            int raW = qBound(18, m_cardW / 8, 22);
+            QRect raRect(dsRect.right() + 4, 6, raW, badgeH);
             p.setPen(QPen(QColor(255, 255, 255, 80), 1));
             p.setBrush(QColor(0, 0, 0, 160));
-            p.drawRoundedRect(raRect, 5, 5);
+            p.drawRoundedRect(raRect, 4, 4);
 
             p.setPen(Qt::NoPen);
             p.setBrush(QColor(QStringLiteral("#f5b041")));
             QPainterPath cup;
-            cup.moveTo(raRect.x() + 6, raRect.y() + 4);
-            cup.lineTo(raRect.x() + 16, raRect.y() + 4);
-            cup.lineTo(raRect.x() + 14, raRect.y() + 9);
-            cup.quadTo(raRect.x() + 11, raRect.y() + 11, raRect.x() + 8, raRect.y() + 9);
+            int cx = raRect.center().x();
+            int cy = raRect.center().y();
+            cup.moveTo(cx - 5, cy - 5);
+            cup.lineTo(cx + 5, cy - 5);
+            cup.lineTo(cx + 3, cy);
+            cup.quadTo(cx, cy + 2, cx - 3, cy);
             cup.closeSubpath();
             p.drawPath(cup);
-            p.fillRect(QRect(raRect.x() + 10, raRect.y() + 11, 2, 2), QColor(QStringLiteral("#f5b041")));
-            p.fillRect(QRect(raRect.x() + 8, raRect.y() + 13, 6, 2), QColor(QStringLiteral("#f5b041")));
+            p.fillRect(QRect(cx - 1, cy + 2, 2, 2), QColor(QStringLiteral("#f5b041")));
+            p.fillRect(QRect(cx - 3, cy + 4, 6, 2), QColor(QStringLiteral("#f5b041")));
         }
 
         // Draw hover border
@@ -222,6 +231,12 @@ WatermelonLauncher::~WatermelonLauncher() = default;
 
 void WatermelonLauncher::setupUI()
 {
+    int savedCoverSize = Config::GetGlobalTable().GetInt("WatermelonCoverSize");
+    if (savedCoverSize >= 100 && savedCoverSize <= 260)
+        m_coverWidth = savedCoverSize;
+    else
+        m_coverWidth = 169;
+
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(18, 14, 18, 14);
     mainLayout->setSpacing(14);
@@ -356,9 +371,66 @@ void WatermelonLauncher::setupUI()
     gridSectionLayout->setContentsMargins(0, 0, 0, 0);
     gridSectionLayout->setSpacing(12);
 
+    auto* gridHeaderRow = new QHBoxLayout();
+    gridHeaderRow->setContentsMargins(0, 0, 0, 0);
+    gridHeaderRow->setSpacing(8);
+
     auto* gridHeader = new QLabel(tr("<span style='font-size:16px; font-weight:700; color:#f6f5f3;'>🎮 Biblioteca de Juegos</span>"), gridSection);
     gridHeader->setTextFormat(Qt::RichText);
-    gridSectionLayout->addWidget(gridHeader);
+    gridHeaderRow->addWidget(gridHeader);
+
+    gridHeaderRow->addStretch(1);
+
+    auto* sldBox = new QWidget(gridSection);
+    sldBox->setStyleSheet(QStringLiteral("background: transparent;"));
+    auto* sldLay = new QHBoxLayout(sldBox);
+    sldLay->setContentsMargins(0, 0, 0, 0);
+    sldLay->setSpacing(6);
+
+    auto* lblSmall = new QLabel(QStringLiteral("▫"), sldBox);
+    lblSmall->setStyleSheet(QStringLiteral("color: #7b7889; font-size: 13px; font-weight: bold;"));
+    lblSmall->setToolTip(tr("Carátulas más pequeñas"));
+    sldLay->addWidget(lblSmall);
+
+    sldCoverSize = new QSlider(Qt::Horizontal, sldBox);
+    sldCoverSize->setRange(100, 260);
+    sldCoverSize->setValue(m_coverWidth);
+    sldCoverSize->setFixedWidth(115);
+    sldCoverSize->setCursor(Qt::PointingHandCursor);
+    sldCoverSize->setToolTip(tr("Tamaño de carátulas: %1 px").arg(m_coverWidth));
+    sldCoverSize->setStyleSheet(QStringLiteral(
+        "QSlider::groove:horizontal {"
+        "  border: none;"
+        "  height: 4px;"
+        "  background: #272632;"
+        "  border-radius: 2px;"
+        "}"
+        "QSlider::sub-page:horizontal {"
+        "  background: #6fbf4a;"
+        "  border-radius: 2px;"
+        "}"
+        "QSlider::handle:horizontal {"
+        "  background: #f6f5f3;"
+        "  border: 2px solid #6fbf4a;"
+        "  width: 14px;"
+        "  margin-top: -5px;"
+        "  margin-bottom: -5px;"
+        "  border-radius: 7px;"
+        "}"
+        "QSlider::handle:horizontal:hover {"
+        "  background: #6fbf4a;"
+        "}"
+    ));
+    connect(sldCoverSize, &QSlider::valueChanged, this, &WatermelonLauncher::onCoverSizeChanged);
+    sldLay->addWidget(sldCoverSize);
+
+    auto* lblLarge = new QLabel(QStringLiteral("◻"), sldBox);
+    lblLarge->setStyleSheet(QStringLiteral("color: #7b7889; font-size: 17px; font-weight: bold;"));
+    lblLarge->setToolTip(tr("Carátulas más grandes"));
+    sldLay->addWidget(lblLarge);
+
+    gridHeaderRow->addWidget(sldBox);
+    gridSectionLayout->addLayout(gridHeaderRow);
 
     gridContainer = new QWidget(gridSection);
     gridContainer->setStyleSheet(QStringLiteral("background: transparent;"));
@@ -525,7 +597,9 @@ void WatermelonLauncher::renderGames()
         emptyLabel->hide();
         gridContainer->show();
 
-        const int cardW = 169, cardH = 150, spacing = 16;
+        const int cardW = m_coverWidth;
+        const int cardH = qRound(m_coverWidth * (150.0 / 169.0));
+        const int spacing = 16;
         int availableWidth = scrollArea ? scrollArea->viewport()->width() : width();
         if (availableWidth < 300) availableWidth = 900;
         int columns = qMax(1, (availableWidth + spacing) / (cardW + spacing));
@@ -594,10 +668,33 @@ void WatermelonLauncher::resizeEvent(QResizeEvent* event)
     }
 }
 
+void WatermelonLauncher::onCoverSizeChanged(int val)
+{
+    m_coverWidth = val;
+    if (sldCoverSize)
+        sldCoverSize->setToolTip(tr("Tamaño de carátulas: %1 px").arg(val));
+
+    Config::GetGlobalTable().SetInt("WatermelonCoverSize", val);
+    Config::Save();
+
+    if (!renderDebounceTimer)
+    {
+        renderDebounceTimer = new QTimer(this);
+        renderDebounceTimer->setSingleShot(true);
+        connect(renderDebounceTimer, &QTimer::timeout, this, &WatermelonLauncher::renderGames);
+    }
+    renderDebounceTimer->start(40);
+}
+
 QWidget* WatermelonLauncher::createGameCard(const WatermelonRom& rom, bool isRecentShelf)
 {
-    const int cardWidth = 169;
-    const int cardHeight = 150;
+    int cardWidth = 169;
+    int cardHeight = 150;
+    if (!isRecentShelf)
+    {
+        cardWidth = m_coverWidth;
+        cardHeight = qRound(m_coverWidth * (150.0 / 169.0));
+    }
     auto* card = new ClickableCard(rom, cardWidth, cardHeight, this);
 
     card->onClick = [this, rom]() {

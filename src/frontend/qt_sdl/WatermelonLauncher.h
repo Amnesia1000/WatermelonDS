@@ -15,6 +15,7 @@ class QHBoxLayout;
 class QScrollArea;
 class QLabel;
 class QPushButton;
+class QSlider;
 
 struct WatermelonRom
 {
@@ -62,6 +63,7 @@ private slots:
     void onRetroAchievementsClicked();
     void onSettingsClicked();
     void onCoverDownloaded(const QString& key, const QPixmap& pixmap);
+    void onCoverSizeChanged(int val);
 
 private:
     void setupUI();
@@ -104,6 +106,8 @@ private:
 
     QWidget* gridContainer = nullptr;
     QLabel* emptyLabel = nullptr;
+    QSlider* sldCoverSize = nullptr;
+    int m_coverWidth = 169;
 
     QList<WatermelonRom> allRoms;
     QList<WatermelonRom> recentRoms;

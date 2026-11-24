@@ -938,211 +938,227 @@ Check your connection or credentials.</translation>
 <context>
     <name>WatermelonLauncher</name>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="246"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="261"/>
         <source>Abrir un archivo ROM...</source>
         <translation>Open a ROM file...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="252"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="267"/>
         <source>Arrancar el firmware de la DS (menú de la consola)</source>
         <translation>Boot DS firmware (console menu)</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="258"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="273"/>
         <source>Partidas multijugador local o por red (LAN)</source>
         <translation>Local wireless or network (LAN) multiplayer games</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="264"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="279"/>
         <source>Catálogo y configuración de shaders</source>
         <translation>Shader catalog and settings</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="270"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="285"/>
         <source>RetroAchievements - Resumen y perfil</source>
         <translation>RetroAchievements - Summary and profile</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="276"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="291"/>
         <source>Ajustes generales, gráficos, emulación y controles</source>
         <translation>General settings, graphics, emulation and controls</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="282"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="297"/>
         <source>Añadir carpeta de juegos</source>
         <translation>Add games folder</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="292"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="307"/>
         <source>Actualizar biblioteca</source>
         <translation>Refresh library</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="330"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="345"/>
         <source>&lt;span style=&apos;font-size:16px; font-weight:700; color:#6fbf4a;&apos;&gt;▶ Continuar Jugando&lt;/span&gt;</source>
         <translation>&lt;span style=&apos;font-size:16px; font-weight:700; color:#6fbf4a;&apos;&gt;▶ Continue Playing&lt;/span&gt;</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="359"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="378"/>
         <source>&lt;span style=&apos;font-size:16px; font-weight:700; color:#f6f5f3;&apos;&gt;🎮 Biblioteca de Juegos&lt;/span&gt;</source>
         <translation>&lt;span style=&apos;font-size:16px; font-weight:700; color:#f6f5f3;&apos;&gt;🎮 Game Library&lt;/span&gt;</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="555"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="392"/>
+        <source>Carátulas más pequeñas</source>
+        <translation>Smaller covers</translation>
+    </message>
+    <message>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="400"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="675"/>
+        <source>Tamaño de carátulas: %1 px</source>
+        <translation>Cover size: %1 px</translation>
+    </message>
+    <message>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="429"/>
+        <source>Carátulas más grandes</source>
+        <translation>Larger covers</translation>
+    </message>
+    <message>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="629"/>
         <source>🔍 Buscar en tu biblioteca...</source>
         <translation>🔍 Search your library...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="556"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="630"/>
         <source>📁 Abrir ROM...</source>
         <translation>📁 Open ROM...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="557"/>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="568"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="631"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="642"/>
         <source>▶ Sistema</source>
         <translation>▶ System</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="558"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="632"/>
         <source>👥 Multijugador</source>
         <translation>👥 Multiplayer</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="559"/>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="570"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="633"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="644"/>
         <source>🎨 Shaders</source>
         <translation>🎨 Shaders</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="560"/>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="571"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="634"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="645"/>
         <source>🏆 Logros</source>
         <translation>🏆 Achievements</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="561"/>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="572"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="635"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="646"/>
         <source>⚙ Ajustes</source>
         <translation>⚙ Settings</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="562"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="636"/>
         <source>➕ Carpeta</source>
         <translation>➕ Folder</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="566"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="640"/>
         <source>🔍 Buscar...</source>
         <translation>🔍 Search...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="567"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="641"/>
         <source>📁 Abrir</source>
         <translation>📁 Open</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="569"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="643"/>
         <source>👥 Multi</source>
         <translation>👥 Multi</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="578"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="652"/>
         <source>▶</source>
         <translation>▶</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="579"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="653"/>
         <source>👥</source>
         <translation>👥</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="580"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="654"/>
         <source>🎨</source>
         <translation>🎨</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1116"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1213"/>
         <source>⚙️  Ajustes de red y multijugador...</source>
         <translation>⚙️  Network and Multiplayer Settings...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="575"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="649"/>
         <source>🍉</source>
         <translation>🍉</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="576"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="650"/>
         <source>🔍</source>
         <translation>🔍</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="577"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="651"/>
         <source>📁</source>
         <translation>📁</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="581"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="655"/>
         <source>🏆</source>
         <translation>🏆</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="582"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="656"/>
         <source>⚙</source>
         <translation>⚙</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="642"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="739"/>
         <source>▶  Iniciar juego</source>
         <translation>▶  Start game</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="644"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="741"/>
         <source>⚙️  Configuración del juego...</source>
         <translation>⚙️  Game settings...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="645"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="742"/>
         <source>🖼️  Pantalla y vistas...</source>
         <translation>🖼️  Display &amp; Views...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="646"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="743"/>
         <source>👾  Trucos (Cheats)...</source>
         <translation>👾  Cheats...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="647"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="744"/>
         <source>🏆  RetroAchievements...</source>
         <translation>🏆  RetroAchievements...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="648"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="745"/>
         <source>📴  Modo Offline...</source>
         <translation>📴  Offline Mode...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="650"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="747"/>
         <source>📁  Abrir carpeta del archivo</source>
         <translation>📁  Open file folder</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="651"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="748"/>
         <source>  Forzar recarga de carátula</source>
         <translation>  Force cover reload</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1111"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1208"/>
         <source>🪟  Nueva instancia (Segunda consola)...</source>
         <translation>🪟  Launch new instance (Second console)...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1113"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1210"/>
         <source>🌐  Crear partida LAN (Host)...</source>
         <translation>🌐  Host LAN game...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1114"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1211"/>
         <source>🔗  Unirse a partida LAN (Cliente)...</source>
         <translation>🔗  Join LAN game...</translation>
     </message>
@@ -1151,7 +1167,7 @@ Check your connection or credentials.</translation>
         <translation type="vanished">⚙️  Multiplayer settings...</translation>
     </message>
     <message>
-        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1138"/>
+        <location filename="../src/frontend/qt_sdl/WatermelonLauncher.cpp" line="1235"/>
         <source>Seleccionar carpeta de juegos de Nintendo DS</source>
         <translation>Select Nintendo DS games folder</translation>
     </message>

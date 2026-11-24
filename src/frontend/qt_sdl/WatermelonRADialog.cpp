@@ -399,7 +399,7 @@ void WatermelonRADialog::onOpenWebProfileClicked()
 
 void WatermelonRADialog::onOpenSettingsClicked()
 {
-    WatermelonSettingsDialog dlg(this, 6); // Category 6 = RetroAchievements
+    WatermelonSettingsDialog dlg(this, 8); // Category 8 = RetroAchievements
     dlg.exec();
     loadUserData();
 }
